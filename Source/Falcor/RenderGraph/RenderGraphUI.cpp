@@ -78,17 +78,17 @@ namespace Falcor
                 mPopupPinHoverTime = 0.0f;
                 mPinIndexToDisplay = -1;
             }
-
+            
             if ((pinIndex != -1) )//&& pinIndex != mPinIndexToDisplay)
             {
                 std::chrono::system_clock::time_point thisTime = std::chrono::system_clock::now();
                 float timeDiff = (std::chrono::duration<float>(thisTime - mLastTime)).count();
                 if(timeDiff < kTimeTillPopup) mPopupPinHoverTime += timeDiff;
                 mLastTime = thisTime;
-                if (mPopupPinHoverTime < kTimeTillPopup) return;
+                //if (mPopupPinHoverTime < kTimeTillPopup) return; //This could cause pin index and node index mismatch when cursor move from one pin to another fast
             }
 
-            if (mPopupPinHoverTime >= kTimeTillPopup) mPopupPinHoverTime = 0.0f;
+            if (mPopupPinHoverTime >= kTimeTillPopup) mPopupPinHoverTime = 0.0f; 
             mPinIndexToDisplay = pinIndex; mPopupPinIsInput = isInput;
         }
 
