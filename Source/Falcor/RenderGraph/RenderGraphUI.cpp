@@ -223,15 +223,26 @@ namespace Falcor
             ImVec2 pinRectBoundsOffsetx{ -kPinRadius * 2.0f, kPinRadius * 4.0f };
             float slotNum = 1.0f;
             float pinOffsetx = kPinRadius * 2.0f;
-            uint32_t pinCount = static_cast<uint32_t>(pCurrentNode->InputsCount);
+            
             bool isInputs = true;
-
-            std::string dummyText; dummyText.resize(32, ' ');
+            size_t maxInputLength = 0, maxOutputLength = 0;
+            for (size_t i = 0; i < pCurrentNode->InputsCount; i++) {
+                if (strlen(pCurrentNode->InputNames[i]) > maxInputLength) {
+                    maxInputLength = strlen(pCurrentNode->InputNames[i]);
+                }
+            }
+            for (size_t i = 0; i < pCurrentNode->OutputsCount; i++) {
+                if (strlen(pCurrentNode->OutputNames[i]) > maxOutputLength) {
+                    maxOutputLength = strlen(pCurrentNode->OutputNames[i]);
+                }
+            }
+            std::string dummyText; dummyText.resize(static_cast<size_t>(1.5*(maxInputLength + maxOutputLength)), ' ');
             ImGui::TextUnformatted(dummyText.c_str());
             ImGui::TextUnformatted(dummyText.c_str());
             ImGui::TextUnformatted(dummyText.c_str());
             ImGui::TextUnformatted(dummyText.c_str());
 
+            uint32_t pinCount = static_cast<uint32_t>(pCurrentNode->InputsCount);
             for (int32_t i = 0; i < paddingSpace; ++i)
             {
                 ImGui::TextUnformatted(dummyText.c_str());
@@ -283,7 +294,7 @@ namespace Falcor
                         // we can draw anything special for execution edge inputs here
                     }
 
-                    ImGui::SetCursorScreenPos({ inputPos.x + pinOffsetx - ((pinOffsetx < 0.0f) ? ImGui::CalcTextSize(isInputs ? pCurrentNode->InputNames[i] : pCurrentNode->OutputNames[i]).x : 0.0f), inputPos.y - kPinRadius });
+                    ImGui::SetCursorScreenPos({ inputPos.x + pinOffsetx - ((pinOffsetx < 0.0f) ? ImGui::CalcTextSize(isInputs ? pCurrentNode->InputNames[i] : pCurrentNode->OutputNames[i]).x : 0.0f), inputPos.y - 2* kPinRadius });
 
                     slotNum++;
                     if (drawLabel) ImGui::TextUnformatted(pText);
@@ -800,7 +811,7 @@ namespace Falcor
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
         if (ImGui::BeginPopup("PinMenu"))
         {
-            if (first) ImGui::SetWindowPos({ ImGui::GetWindowPos().x - 8, ImGui::GetWindowPos().y - 8 });
+            if (first) ImGui::SetWindowPos({ ImGui::GetWindowPos().x + 18, ImGui::GetWindowPos().y + 38 }); // prevent popup menu from overlapping with pin
             else if (isPopupOpen && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem | ImGuiHoveredFlags_ChildWindows))
             {
                 if (ImGui::IsMouseClicked(0) || ImGui::IsMouseClicked(1))
