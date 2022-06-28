@@ -42,7 +42,8 @@ cbuffer PerImageCB
     Texture2D   gMotion;
     Texture2D   gPositionNormalFwidth;
     Texture2D   gColor;
-    Texture2D   gAlbedo;
+    Texture2D   gDiffuseReflectance;
+    Texture2D   gSpecularReflectance;
     Texture2D   gEmission;
     Texture2D   gPrevIllum;
     Texture2D   gPrevMoments;
@@ -203,7 +204,7 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     const float4 posH = vsOut.posH;
     const int2 ipos = posH.xy;
 
-    float3 illumination = demodulate(gColor[ipos].rgb - gEmission[ipos].rgb, gAlbedo[ipos].rgb);
+    float3 illumination = demodulate(gColor[ipos].rgb - gEmission[ipos].rgb, gDiffuseReflectance[ipos].rgb + gSpecularReflectance[ipos].rgb);
     // Workaround path tracer bugs. TODO: remove this when we can.
     if (isNaN(illumination.x) || isNaN(illumination.y) || isNaN(illumination.z))
     {

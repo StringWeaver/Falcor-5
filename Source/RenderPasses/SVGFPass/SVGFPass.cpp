@@ -57,7 +57,8 @@ namespace
     const char kMomentsAlpha[] = "MomentsAlpha";
 
     // Input buffer names
-    const char kInputBufferAlbedo[] = "Albedo";
+    const char kInputBufferDiffuseReflectance[] = "DiffuseReflectance";
+    const char kInputBufferSpecularReflectance[] = "SpecularReflectance";
     const char kInputBufferColor[] = "Color";
     const char kInputBufferEmission[] = "Emission";
     const char kInputBufferWorldPosition[] = "WorldPosition";
@@ -145,7 +146,8 @@ RenderPassReflection SVGFPass::reflect(const CompileData& compileData)
 {
     RenderPassReflection reflector;
 
-    reflector.addInput(kInputBufferAlbedo, "Albedo");
+    reflector.addInput(kInputBufferDiffuseReflectance, "DiffuseReflectance");
+    reflector.addInput(kInputBufferSpecularReflectance, "SpecularReflectance");
     reflector.addInput(kInputBufferColor, "Color");
     reflector.addInput(kInputBufferEmission, "Emission");
     reflector.addInput(kInputBufferWorldPosition, "World Position");
@@ -180,7 +182,8 @@ void SVGFPass::compile(RenderContext* pRenderContext, const CompileData& compile
 
 void SVGFPass::execute(RenderContext* pRenderContext, const RenderData& renderData)
 {
-    Texture::SharedPtr pAlbedoTexture = renderData[kInputBufferAlbedo]->asTexture();
+    Texture::SharedPtr pDiffuseReflectanceTexture = renderData[kInputBufferDiffuseReflectance]->asTexture();
+    Texture::SharedPtr pSpecularReflectanceTexture = renderData[kInputBufferSpecularReflectance]->asTexture();
     Texture::SharedPtr pColorTexture = renderData[kInputBufferColor]->asTexture();
     Texture::SharedPtr pEmissionTexture = renderData[kInputBufferEmission]->asTexture();
     Texture::SharedPtr pWorldPositionTexture = renderData[kInputBufferWorldPosition]->asTexture();
@@ -192,8 +195,10 @@ void SVGFPass::execute(RenderContext* pRenderContext, const RenderData& renderDa
     Texture::SharedPtr pOutputTexture = renderData[kOutputBufferFilteredImage]->asTexture();
 
     FALCOR_ASSERT(mpFilteredIlluminationFbo &&
-           mpFilteredIlluminationFbo->getWidth() == pAlbedoTexture->getWidth() &&
-           mpFilteredIlluminationFbo->getHeight() == pAlbedoTexture->getHeight());
+           mpFilteredIlluminationFbo->getWidth() == pDiffuseReflectanceTexture->getWidth() &&
+           mpFilteredIlluminationFbo->getHeight() == pDiffuseReflectanceTexture->getHeight() &&
+            mpFilteredIlluminationFbo->getWidth() == pSpecularReflectanceTexture->getWidth() &&
+            mpFilteredIlluminationFbo->getHeight() == pSpecularReflectanceTexture->getHeight());
 
     if (mBuffersNeedClear)
     {
@@ -213,7 +218,8 @@ void SVGFPass::execute(RenderContext* pRenderContext, const RenderData& renderDa
         // per-pixel history length in mpCurReprojFbo.
         Texture::SharedPtr pPrevLinearZAndNormalTexture =
             renderData[kInternalBufferPreviousLinearZAndNormal]->asTexture();
-        computeReprojection(pRenderContext, pAlbedoTexture, pColorTexture, pEmissionTexture,
+        computeReprojection(pRenderContext, pDiffuseReflectanceTexture
+            , pSpecularReflectanceTexture, pColorTexture, pEmissionTexture,
                             pMotionVectorTexture, pPosNormalFwidthTexture,
                             pPrevLinearZAndNormalTexture);
 
@@ -226,11 +232,12 @@ void SVGFPass::execute(RenderContext* pRenderContext, const RenderData& renderDa
         // in mpPingPongFbo[0].  Along the way (or at the end, depending on
         // the value of mFeedbackTap), save the filtered illumination for
         // next time into mpFilteredPastFbo.
-        computeAtrousDecomposition(pRenderContext, pAlbedoTexture);
+        computeAtrousDecomposition(pRenderContext, pDiffuseReflectanceTexture, pSpecularReflectanceTexture);
 
         // Compute albedo * filtered illumination and add emission back in.
         auto perImageCB = mpFinalModulate["PerImageCB"];
-        perImageCB["gAlbedo"] = pAlbedoTexture;
+        perImageCB["gDiffuseReflectance"] = pDiffuseReflectanceTexture;
+        perImageCB["gSpecularReflectance"] = pSpecularReflectanceTexture;
         perImageCB["gEmission"] = pEmissionTexture;
         perImageCB["gIllumination"] = mpPingPongFbo[0]->getColorTexture(0);
         mpFinalModulate->execute(pRenderContext, mpFinalFbo);
@@ -314,7 +321,7 @@ void SVGFPass::computeLinearZAndNormal(RenderContext* pRenderContext, Texture::S
     mpPackLinearZAndNormal->execute(pRenderContext, mpLinearZAndNormalFbo);
 }
 
-void SVGFPass::computeReprojection(RenderContext* pRenderContext, Texture::SharedPtr pAlbedoTexture,
+void SVGFPass::computeReprojection(RenderContext* pRenderContext, Texture::SharedPtr pDiffuseReflectanceTexture, Texture::SharedPtr pSpecularReflectanceTexture,
                                    Texture::SharedPtr pColorTexture, Texture::SharedPtr pEmissionTexture,
                                    Texture::SharedPtr pMotionVectorTexture,
                                    Texture::SharedPtr pPositionNormalFwidthTexture,
@@ -326,7 +333,8 @@ void SVGFPass::computeReprojection(RenderContext* pRenderContext, Texture::Share
     perImageCB["gMotion"]        = pMotionVectorTexture;
     perImageCB["gColor"]         = pColorTexture;
     perImageCB["gEmission"]      = pEmissionTexture;
-    perImageCB["gAlbedo"]        = pAlbedoTexture;
+    perImageCB["gDiffuseReflectance"] = pDiffuseReflectanceTexture;
+    perImageCB["gSpecularReflectance"] = pSpecularReflectanceTexture;
     perImageCB["gPositionNormalFwidth"] = pPositionNormalFwidthTexture;
     perImageCB["gPrevIllum"]     = mpFilteredPastFbo->getColorTexture(0);
     perImageCB["gPrevMoments"]   = mpPrevReprojFbo->getColorTexture(1);
@@ -356,11 +364,12 @@ void SVGFPass::computeFilteredMoments(RenderContext* pRenderContext)
     mpFilterMoments->execute(pRenderContext, mpPingPongFbo[0]);
 }
 
-void SVGFPass::computeAtrousDecomposition(RenderContext* pRenderContext, Texture::SharedPtr pAlbedoTexture)
+void SVGFPass::computeAtrousDecomposition(RenderContext* pRenderContext, Texture::SharedPtr pDiffuseReflectanceTexture, Texture::SharedPtr pSpecularReflectanceTexture)
 {
     auto perImageCB = mpAtrous["PerImageCB"];
 
-    perImageCB["gAlbedo"]        = pAlbedoTexture;
+    perImageCB["gDiffuseReflectance"] = pDiffuseReflectanceTexture;
+    perImageCB["gSpecularReflectance"] = pSpecularReflectanceTexture;
     perImageCB["gHistoryLength"] = mpCurReprojFbo->getColorTexture(2);
     perImageCB["gLinearZAndNormal"]       = mpLinearZAndNormalFbo->getColorTexture(0);
 
