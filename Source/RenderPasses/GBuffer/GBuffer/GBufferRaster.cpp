@@ -40,18 +40,20 @@ namespace
     // Additional output channels.
     // TODO: Some are RG32 floats now. I'm sure that all of these could be fp16.
     const std::string kVBufferName = "vbuffer";
+    const std::string kDepthName = "depth";
+    const std::string kEmissionName = "emissive";
     const ChannelList kGBufferExtraChannels =
     {
         { kVBufferName,     "gVBuffer",             "Visibility buffer",                        true /* optional */, ResourceFormat::Unknown /* set at runtime */ },
         { "diffuseOpacity", "gDiffOpacity",         "Diffuse reflection albedo and opacity",    true /* optional */, ResourceFormat::RGBA32Float },
         { "specRough",      "gSpecRough",           "Specular reflectance and roughness",       true /* optional */, ResourceFormat::RGBA32Float },
-        { "emissive",       "gEmissive",            "Emissive color",                           true /* optional */, ResourceFormat::RGBA32Float },
+        { kEmissionName,    "gEmissive",            "Emissive color",                           true /* optional */, ResourceFormat::RGBA32Float },
         { "viewW",          "gViewW",               "View direction in world space",            true /* optional */, ResourceFormat::RGBA32Float }, // TODO: Switch to packed 2x16-bit snorm format.
         { "pnFwidth",       "gPosNormalFwidth",     "Position and normal filter width",         true /* optional */, ResourceFormat::RG32Float   },
         { "linearZ",        "gLinearZAndDeriv",     "Linear z (and derivative)",                true /* optional */, ResourceFormat::RG32Float   },
     };
 
-    const std::string kDepthName = "depth";
+    
 }
 
 RenderPassReflection GBufferRaster::reflect(const CompileData& compileData)
@@ -117,8 +119,13 @@ void GBufferRaster::compile(RenderContext* pRenderContext, const CompileData& co
     mpDepthPrePassGraph = RenderGraph::create("Depth Pre-Pass");
     mpDepthPrePass = DepthPass::create(pRenderContext);
     mpDepthPrePass->setDepthBufferFormat(ResourceFormat::D32Float);
+    mpSkyBox = SkyBox::create(pRenderContext);
+    
     mpDepthPrePassGraph->addPass(mpDepthPrePass, "DepthPrePass");
+    mpDepthPrePassGraph->addPass(mpSkyBox,"SkyBox");
+    mpDepthPrePassGraph->addEdge("DepthPrePass.depth", "SkyBox.depth");
     mpDepthPrePassGraph->markOutput("DepthPrePass.depth");
+    mpDepthPrePassGraph->markOutput("SkyBox.target");
     mpDepthPrePassGraph->setScene(mpScene);
 }
 
@@ -148,7 +155,8 @@ void GBufferRaster::execute(RenderContext* pRenderContext, const RenderData& ren
 
     // Update frame dimension based on render pass output.
     auto pDepth = renderData[kDepthName]->asTexture();
-    FALCOR_ASSERT(pDepth);
+    auto pEmission = renderData[kEmissionName]->asTexture();
+    FALCOR_ASSERT(pDepth&&pEmission);
     updateFrameDim(uint2(pDepth->getWidth(), pDepth->getHeight()));
 
     // Bind primary channels as render targets and clear them.
@@ -193,9 +201,12 @@ void GBufferRaster::execute(RenderContext* pRenderContext, const RenderData& ren
     // Execute depth pass and copy depth buffer.
     mpDepthPrePassGraph->execute(pRenderContext);
     auto pPreDepth = mpDepthPrePassGraph->getOutput("DepthPrePass.depth")->asTexture();
+    auto pPreEmission = mpDepthPrePassGraph->getOutput("SkyBox.target")->asTexture();
     FALCOR_ASSERT(pPreDepth && pPreDepth->getWidth() == mFrameDim.x && pPreDepth->getHeight() == mFrameDim.y);
+    FALCOR_ASSERT(pPreEmission && pPreEmission->getWidth() == mFrameDim.x && pPreEmission->getHeight() == mFrameDim.y);
     mpFbo->attachDepthStencilTarget(pPreDepth);
     pRenderContext->copyResource(pDepth.get(), pPreDepth.get());
+    pRenderContext->copyResource(pEmission.get(), pPreEmission.get());
 
     // Bind extra channels as UAV buffers.
     for (const auto& channel : kGBufferExtraChannels)

@@ -28,6 +28,7 @@
 #pragma once
 #include "GBuffer.h"
 #include "../RenderPasses/DepthPass/DepthPass.h"
+#include "../RenderPasses/SkyBox/SkyBox.h"
 
 using namespace Falcor;
 
@@ -53,6 +54,7 @@ private:
 
     // Internal state
     DepthPass::SharedPtr            mpDepthPrePass;
+    SkyBox::SharedPtr               mpSkyBox;
     RenderGraph::SharedPtr          mpDepthPrePassGraph;
     Fbo::SharedPtr                  mpFbo;
 

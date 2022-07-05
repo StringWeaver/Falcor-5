@@ -39,6 +39,9 @@
     <ProjectReference Include="..\DepthPass\DepthPass.vcxproj">
       <Project>{730aa5b9-7ddb-40af-a882-eb39b9d3ac7c}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\SkyBox\SkyBox.vcxproj">
+      <Project>{c6eb0ac0-ff3b-474e-a453-44d84329d13a}</Project>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GBufferBase.h" />

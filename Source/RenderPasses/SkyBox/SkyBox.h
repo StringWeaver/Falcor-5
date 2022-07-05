@@ -29,8 +29,13 @@
 #include "Falcor.h"
 
 using namespace Falcor;
+#ifdef BUILD_SKYBOX_PASS
+#define PASS_API FALCOR_API_EXPORT
+#else
+#define PASS_API FALCOR_API_IMPORT
+#endif
 
-class SkyBox : public RenderPass
+class PASS_API SkyBox : public RenderPass
 {
 public:
     using SharedPtr = std::shared_ptr<SkyBox>;
@@ -70,3 +75,5 @@ private:
     Scene::SharedPtr mpScene;
     Sampler::SharedPtr mpSampler;
 };
+
+#undef PASS_API
