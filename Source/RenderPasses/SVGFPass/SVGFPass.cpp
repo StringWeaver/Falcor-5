@@ -218,8 +218,8 @@ void SVGFPass::execute(RenderContext* pRenderContext, const RenderData& renderDa
         // per-pixel history length in mpCurReprojFbo.
         Texture::SharedPtr pPrevLinearZAndNormalTexture =
             renderData[kInternalBufferPreviousLinearZAndNormal]->asTexture();
-        computeReprojection(pRenderContext, pDiffuseReflectanceTexture
-            , pSpecularReflectanceTexture, pColorTexture, pEmissionTexture,
+        computeReprojection(pRenderContext, pDiffuseReflectanceTexture,
+                            pSpecularReflectanceTexture, pColorTexture, pEmissionTexture,
                             pMotionVectorTexture, pPosNormalFwidthTexture,
                             pPrevLinearZAndNormalTexture);
 
