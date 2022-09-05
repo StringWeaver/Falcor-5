@@ -84,61 +84,44 @@ bool loadPrevData(float2 posH, out float4 prevIllum, out float2 prevMoments, out
     const float2 motion = gMotion[ipos].xy;
     const float normalFwidth = gPositionNormalFwidth[ipos].y;
 
-    // +0.5 to account for texel center offset
-    const int2 iposPrev = int2(float2(ipos) + motion.xy * imageDim + float2(0.5,0.5));
+     const float2 posPrev = posH.xy + motion.xy * imageDim;
+     const int2 iposPrev = int2(posPrev);
 
     float2 depth = gLinearZAndNormal[ipos].xy;
     float3 normal = oct_to_ndir_snorm(gLinearZAndNormal[ipos].zw);
 
     prevIllum   = float4(0,0,0,0);
-    prevMoments = float2(0,0);
+    prevMoments = float2(0, 0);
+    historyLength = 0.0;
 
     bool v[4];
-    const float2 posPrev = floor(posH.xy) + motion.xy * imageDim;
-    const int2 offset[4] = { int2(0, 0), int2(1, 0), int2(0, 1), int2(1, 1) };
+    
+    const float2 offset[4] = { float2(-0.5, -0.5), float2(0.5, -0.5), float2(-0.5, 0.5), float2(0.5, 0.5) };
 
     // check for all 4 taps of the bilinear filter for validity
     bool valid = false;
-    for (int sampleIdx = 0; sampleIdx < 4; sampleIdx++)
+    float sumw = 0;
+    for (int tapIdx = 0; tapIdx < 4; tapIdx++)
     {
-        int2 loc = int2(posPrev) + offset[sampleIdx];
-        float2 depthPrev = gPrevLinearZAndNormal[loc].xy;
-        float3 normalPrev = oct_to_ndir_snorm(gPrevLinearZAndNormal[loc].zw);
+        float2 tapPos = posPrev + offset[tapIdx];
+        int2 tapIpos = tapPos;
+        float2 tapCenter = tapIpos + float2(0.5, 0.5);
+        float tapWeight = (1.0 - abs(posPrev.x - tapCenter.x)) * (1.0 - abs(posPrev.y - tapCenter.y));
+        float2 depthPrev = gPrevLinearZAndNormal[tapIpos].xy;
+        float3 normalPrev = oct_to_ndir_snorm(gPrevLinearZAndNormal[tapIpos].zw);
 
-        v[sampleIdx] = isReprjValid(iposPrev, depth.x, depthPrev.x, depth.y, normal, normalPrev, normalFwidth);
-
-        valid = valid || v[sampleIdx];
+        if (isReprjValid(tapIpos, depth.x, depthPrev.x, depth.y, normal, normalPrev, normalFwidth)) {
+            prevIllum += tapWeight * gPrevIllum[tapIpos];
+            prevMoments += tapWeight * gPrevMoments[tapIpos].xy;
+            historyLength += gPrevHistoryLength[tapIpos].x;
+            sumw += tapWeight;
+        };
     }
+    valid = (sumw >= 0.01);
+    prevIllum = valid ? prevIllum / sumw : float4(0, 0, 0, 0);
+    prevMoments = valid ? prevMoments / sumw : float2(0, 0);
+    historyLength = valid ? historyLength / sumw : 0.0;
 
-    if (valid)
-    {
-        float sumw = 0;
-        float x = frac(posPrev.x);
-        float y = frac(posPrev.y);
-
-        // bilinear weights
-        const float w[4] = { (1 - x) * (1 - y),
-                                  x  * (1 - y),
-                             (1 - x) *      y,
-                                  x  *      y };
-
-        // perform the actual bilinear interpolation
-        for (int sampleIdx = 0; sampleIdx < 4; sampleIdx++)
-        {
-            const int2 loc = int2(posPrev) + offset[sampleIdx];
-            if (v[sampleIdx])
-            {
-                prevIllum   += w[sampleIdx] * gPrevIllum[loc];
-                prevMoments += w[sampleIdx] * gPrevMoments[loc].xy;
-                sumw        += w[sampleIdx];
-             }
-        }
-
-        // redistribute weights in case not all taps were used
-        valid = (sumw >= 0.01);
-        prevIllum   = valid ? prevIllum / sumw   : float4(0, 0, 0, 0);
-        prevMoments = valid ? prevMoments / sumw : float2(0, 0);
-    }
 
     if (!valid) // perform cross-bilateral filter in the hope to find some suitable samples somewhere
     {
@@ -158,6 +141,7 @@ bool loadPrevData(float2 posH, out float4 prevIllum, out float2 prevMoments, out
                 {
                     prevIllum += gPrevIllum[p];
                     prevMoments += gPrevMoments[p].xy;
+                    historyLength += gPrevHistoryLength[p].x;
                     nValid += 1.0;
                 }
             }
@@ -167,20 +151,10 @@ bool loadPrevData(float2 posH, out float4 prevIllum, out float2 prevMoments, out
             valid = true;
             prevIllum   /= nValid;
             prevMoments /= nValid;
+            historyLength /= valid;
         }
     }
 
-    if (valid)
-    {
-        // crude, fixme
-        historyLength = gPrevHistoryLength[iposPrev].x;
-    }
-    else
-    {
-        prevIllum   = float4(0,0,0,0);
-        prevMoments = float2(0,0);
-        historyLength = 0;
-    }
 
     return valid;
 }
