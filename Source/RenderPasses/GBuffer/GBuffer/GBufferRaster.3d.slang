@@ -70,7 +70,7 @@ float2 computeMotionVector(const VSOut vsOut, const int2 ipos)
 {
     float2 pixelPos = ipos + float2(0.5, 0.5); // Current sample in pixel coords.
     float4 prevPosH = vsOut.prevPosH; // Sample in previous frame in clip space coords, no jittering applied.
-    return calcMotionVector(pixelPos, prevPosH, gFrameDim) + float2(gScene.camera.data.jitterX, -gScene.camera.data.jitterY); // Remove camera jitter from motion vector
+    return calcMotionVector(pixelPos + float2(gScene.camera.data.jitterX, -gScene.camera.data.jitterY), prevPosH, gFrameDim) ; // Remove camera jitter from motion vector
 }
 
 [earlydepthstencil]
@@ -96,7 +96,7 @@ GBufferPSOut psMain(VSOut vsOut, uint triangleIndex : SV_PrimitiveID, float3 bar
     // Create BSDF instance.
     let bsdf = gScene.materials.getBSDF(sd, lod);
 
-    const GBufferData gbuf = prepareGBufferData(sd, bsdf);
+    const GBufferData gbufData = prepareGBufferData(sd, bsdf);
 
     const float4 texGrads = float4(ddx(sd.uv), ddy(sd.uv));
     const float2 mvec = computeMotionVector(vsOut, ipos);
@@ -104,20 +104,20 @@ GBufferPSOut psMain(VSOut vsOut, uint triangleIndex : SV_PrimitiveID, float3 bar
     GBufferPSOut psOut = {};
 
     // Store render target outputs.
-    if (is_valid(gPosW))            psOut.posW          = gbuf.posW;
-    if (is_valid(gNormW))           psOut.normW         = gbuf.normW;
-    if (is_valid(gTangentW))        psOut.tangentW      = gbuf.tangentW;
-    if (is_valid(gFaceNormalW))     psOut.faceNormalW   = gbuf.faceNormalW;
-    if (is_valid(gTexC))            psOut.texC          = gbuf.texC;
+    if (is_valid(gPosW)) psOut.posW = gbufData.posW;
+    if (is_valid(gNormW)) psOut.normW = gbufData.normW;
+    if (is_valid(gTangentW)) psOut.tangentW = gbufData.tangentW;
+    if (is_valid(gFaceNormalW)) psOut.faceNormalW = gbufData.faceNormalW;
+    if (is_valid(gTexC)) psOut.texC = gbufData.texC;
     if (is_valid(gTexGrads))        psOut.texGrads      = texGrads;
-    if (is_valid(gMotionVector))    psOut.mvec          = mvec;
-    if (is_valid(gMaterialData))    psOut.mtlData       = gbuf.mtlData;
+    if (is_valid(gMotionVector)) psOut.mvec = mvec;
+    if (is_valid(gMaterialData)) psOut.mtlData = gbufData.mtlData;
 
     // Store UAV outputs.
-    if (is_valid(gViewW))           gViewW[ipos]        = float4(sd.V, 0.f);
-    if (is_valid(gDiffOpacity))     gDiffOpacity[ipos]  = gbuf.diffuseOpacity;
-    if (is_valid(gSpecRough))       gSpecRough[ipos]    = gbuf.specRough;
-    if (is_valid(gEmissive))        gEmissive[ipos]     = gbuf.emissive;
+    if (is_valid(gViewW)) gViewW[ipos] = float4(sd.V, 0.f);
+    if (is_valid(gDiffOpacity)) gDiffOpacity[ipos] = gbufData.diffuseOpacity;
+    if (is_valid(gSpecRough)) gSpecRough[ipos] = gbufData.specRough;
+    if (is_valid(gEmissive)) gEmissive[ipos] = gbufData.emissive;
 
     // Length of derivatives of position and normal
     if (is_valid(gPosNormalFwidth))

@@ -73,6 +73,7 @@ namespace Falcor
         // Keep copies of the transforms used for the previous frame. We need these for computing motion vectors etc.
         mData.prevViewMat = mPrevData.viewMat;
         mData.prevViewProjMatNoJitter = mPrevData.viewProjMatNoJitter;
+        mData.prevViewProjMat = mPrevData.viewProjMat;
         mData.prevPosW = mPrevData.posW;
 
         mChanges = is_set(mChanges, Changes::Movement | Changes::Frustum) ? Changes::History : Changes::None;
