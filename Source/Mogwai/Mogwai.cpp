@@ -33,6 +33,7 @@
 
 #include <filesystem>
 #include <algorithm>
+#include <shlobj.h>
 
 FALCOR_EXPORT_D3D12_AGILITY_SDK
 
@@ -48,6 +49,35 @@ namespace Mogwai
         const std::string kGraphNameSwitch = "--graph-name";
 
         const std::filesystem::path kAppDataPath = getAppDataDirectory() / "NVIDIA/Falcor/Mogwai.json";
+
+        static std::wstring GetLatestWinPixGpuCapturerPath()
+        {
+            LPWSTR programFilesPath = nullptr;
+            SHGetKnownFolderPath(FOLDERID_ProgramFiles, KF_FLAG_DEFAULT, NULL, &programFilesPath);
+
+            std::filesystem::path pixInstallationPath = programFilesPath;
+            pixInstallationPath /= "Microsoft PIX";
+
+            std::wstring newestVersionFound;
+
+            for (auto const& directory_entry : std::filesystem::directory_iterator(pixInstallationPath))
+            {
+                if (directory_entry.is_directory())
+                {
+                    if (newestVersionFound.empty() || newestVersionFound < directory_entry.path().filename().c_str())
+                    {
+                        newestVersionFound = directory_entry.path().filename().c_str();
+                    }
+                }
+            }
+
+            if (newestVersionFound.empty())
+            {
+                // TODO: Error, no PIX installation found
+            }
+
+            return pixInstallationPath / newestVersionFound / L"WinPixGpuCapturer.dll";
+        }
     }
 
     size_t Renderer::DebugWindow::index = 0;
@@ -699,7 +729,12 @@ namespace Mogwai
 
 int main(int argc, char** argv)
 {
-
+    // Inject PIX for debugging
+    // Check to see if a copy of WinPixGpuCapturer.dll has already been injected into the application.
+    if (GetModuleHandle(L"WinPixGpuCapturer.dll") == 0)
+    {
+        LoadLibrary(Mogwai::GetLatestWinPixGpuCapturerPath().c_str());
+    }
     args::ArgumentParser parser("Mogwai render application.");
     parser.helpParams.programName = "Mogwai";
     args::HelpFlag helpFlag(parser, "help", "Display this help menu.", {'h', "help"});
