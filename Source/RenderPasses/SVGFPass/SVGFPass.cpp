@@ -74,6 +74,8 @@ namespace
 
     // Output buffer name
     const char kOutputBufferFilteredImage[] = "Filtered image";
+    const char kOutputBufferVariance[] = "Variance";
+    const char kOutputBufferHistoryLength[] = "History length";
 }
 
 // Don't remove this. it's required for hot-reload to function properly
@@ -169,7 +171,9 @@ RenderPassReflection SVGFPass::reflect(const CompileData& compileData)
         .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource)
         ;
 
-    reflector.addOutput(kOutputBufferFilteredImage, "Filtered image").format(ResourceFormat::RGBA16Float);
+    reflector.addOutput(kOutputBufferFilteredImage, "Filtered image").format(ResourceFormat::RGBA32Float);
+    reflector.addOutput(kOutputBufferVariance, "Variance").format(ResourceFormat::R16Float);
+    reflector.addOutput(kOutputBufferHistoryLength, "History length").format(ResourceFormat::R16Float);
 
     return reflector;
 }
@@ -192,7 +196,9 @@ void SVGFPass::execute(RenderContext* pRenderContext, const RenderData& renderDa
     Texture::SharedPtr pLinearZTexture = renderData[kInputBufferLinearZ]->asTexture();
     Texture::SharedPtr pMotionVectorTexture = renderData[kInputBufferMotionVector]->asTexture();
 
-    Texture::SharedPtr pOutputTexture = renderData[kOutputBufferFilteredImage]->asTexture();
+    Texture::SharedPtr pOutputColorTexture = renderData[kOutputBufferFilteredImage]->asTexture();
+    Texture::SharedPtr pOutputVarianceTexture = renderData[kOutputBufferVariance]->asTexture();
+    Texture::SharedPtr pOutputHistoryLengthTexture = renderData[kOutputBufferHistoryLength]->asTexture();
 
     FALCOR_ASSERT(mpFilteredIlluminationFbo &&
            mpFilteredIlluminationFbo->getWidth() == pDiffuseReflectanceTexture->getWidth() &&
@@ -243,7 +249,9 @@ void SVGFPass::execute(RenderContext* pRenderContext, const RenderData& renderDa
         mpFinalModulate->execute(pRenderContext, mpFinalFbo);
 
         // Blit into the output texture.
-        pRenderContext->blit(mpFinalFbo->getColorTexture(0)->getSRV(), pOutputTexture->getRTV());
+        pRenderContext->blit(mpFinalFbo->getColorTexture(0)->getSRV(), pOutputColorTexture->getRTV());
+        pRenderContext->blit(mpFinalFbo->getColorTexture(1)->getSRV(), pOutputVarianceTexture->getRTV());
+        pRenderContext->blit(mpCurReprojFbo->getColorTexture(2)->getSRV(), pOutputHistoryLengthTexture->getRTV());
 
         // Swap resources so we're ready for next frame.
         std::swap(mpCurReprojFbo, mpPrevReprojFbo);
@@ -252,7 +260,7 @@ void SVGFPass::execute(RenderContext* pRenderContext, const RenderData& renderDa
     }
     else
     {
-        pRenderContext->blit(pColorTexture->getSRV(), pOutputTexture->getRTV());
+        pRenderContext->blit(pColorTexture->getSRV(), pOutputColorTexture->getRTV());
     }
 }
 
@@ -280,7 +288,8 @@ void SVGFPass::allocateFbos(uint2 dim, RenderContext* pRenderContext)
     {
         // Screen-size FBOs with 1 RGBA32F buffer
         Fbo::Desc desc;
-        desc.setColorTarget(0, Falcor::ResourceFormat::RGBA32Float);
+        desc.setColorTarget(0, Falcor::ResourceFormat::RGBA32Float); //color
+        desc.setColorTarget(1, Falcor::ResourceFormat::R16Float);  //variance
         mpPingPongFbo[0]  = Fbo::create2D(dim.x, dim.y, desc);
         mpPingPongFbo[1]  = Fbo::create2D(dim.x, dim.y, desc);
         mpFilteredPastFbo = Fbo::create2D(dim.x, dim.y, desc);

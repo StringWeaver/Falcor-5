@@ -113,7 +113,7 @@ float4 main(FullScreenPassVsOut vsOut) : SV_TARGET0
         // give the variance a boost for the first frames
         variance *= 4.0 / h;
 
-        return float4(sumIllumination, variance.r);
+        return float4(sumIllumination, variance);
     }
     else
     {

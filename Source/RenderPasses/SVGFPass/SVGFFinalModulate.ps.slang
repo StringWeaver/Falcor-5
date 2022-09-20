@@ -35,10 +35,15 @@ cbuffer PerImageCB
     Texture2D   gEmission;
     Texture2D   gIllumination;
 };
-
-float4 main(FullScreenPassVsOut vsOut) : SV_TARGET0
+struct PS_OUT{
+    float3 outColor: SV_TARGET0;
+    float outVariance : SV_TARGET1;
+}
+PS_OUT main(FullScreenPassVsOut vsOut) 
 {
+    PS_OUT psOut;
     const int2 ipos = int2(vsOut.posH.xy);
-
-    return (gDiffuseReflectance[ipos] + gSpecularReflectance[ipos]) * gIllumination[ipos] + gEmission[ipos];
+    psOut.outColor = (gDiffuseReflectance[ipos].rgb + gSpecularReflectance[ipos].rgb) * gIllumination[ipos].rgb + gEmission[ipos].rgb;
+    psOut.outVariance = gIllumination[ipos].a;
+    return psOut;
 }
