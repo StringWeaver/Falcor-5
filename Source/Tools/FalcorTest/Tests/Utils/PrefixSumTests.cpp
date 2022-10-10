@@ -27,6 +27,7 @@
  **************************************************************************/
 #include "Testing/UnitTest.h"
 #include "Utils/Algorithm/PrefixSum.h"
+#include <chrono>
 #include <random>
 
 namespace Falcor
@@ -64,7 +65,11 @@ namespace Falcor
 
             // Execute prefix sum on the GPU.
             uint32_t sum = 0;
+            auto startTime = std::chrono::steady_clock::now();
             pPrefixSum->execute(ctx.getRenderContext(), pTestDataBuffer, numElems, &sum, pSumBuffer, 0);
+            auto endTime = std::chrono::steady_clock::now();
+            uint64_t elapsedMS = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
+            std::cout << "Prefix Sum GPU execute time cost:" << elapsedMS << "ms\n";
 
             // Compute prefix sum on the CPU for comparison.
             const uint32_t refSum = prefixSum(testData);

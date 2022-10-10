@@ -35,7 +35,7 @@ namespace Falcor
     namespace
     {
         const char kShaderFile[] = "Utils/Algorithm/PrefixSum.cs.slang";
-        const uint32_t kGroupSize = 1024;
+        const uint32_t kGroupSize = 1024; //???
     }
 
     PrefixSum::PrefixSum()
@@ -50,6 +50,7 @@ namespace Falcor
         mpComputeState = ComputeState::create();
 
         // Create and bind buffer for per-group sums and total sum.
+        // Pay attetion the size
         mpPrefixGroupSums = Buffer::create(kGroupSize * sizeof(uint32_t), Resource::BindFlags::ShaderResource | Resource::BindFlags::UnorderedAccess, Buffer::CpuAccess::None, nullptr);
         mpTotalSum = Buffer::create(sizeof(uint32_t), Resource::BindFlags::UnorderedAccess, Buffer::CpuAccess::None, nullptr);
         mpPrevTotalSum = Buffer::create(sizeof(uint32_t), Resource::BindFlags::ShaderResource, Buffer::CpuAccess::None, nullptr);
@@ -84,7 +85,7 @@ namespace Falcor
 
         for (uint32_t iter = 0; iter < iterationsCount; iter++)
         {
-            // Compute number of thread groups in the first pass. Each thread operates on two elements.
+            // Compute number of thread groups in the first pass. Each thread operates on two elements.!!!
             uint32_t numPrefixGroups = std::max(1u, div_round_up(std::min(elementCount, maxElementCountPerIteration), kGroupSize * 2));
             FALCOR_ASSERT(numPrefixGroups > 0 && numPrefixGroups <= kGroupSize);
 
