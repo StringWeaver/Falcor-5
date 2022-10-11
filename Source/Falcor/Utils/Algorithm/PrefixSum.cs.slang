@@ -40,13 +40,12 @@ cbuffer CB
 {
     uint gNumGroups;        ///< Number of groups we'll process, each group is 2N elements.
     uint gTotalNumElems;    ///< Total number of elements. This does not have to be a multiple of the group size.
-    uint gIter;             ///< The current iteration, if there are more elements than 2 * GROUP_SIZE * GROUP_SIZE, the prefix sum will be split into multiple iterations.
+    uint gIter;             ///< The current iteration, if there are more elements than 4 * GROUP_SIZE * GROUP_SIZE, the prefix sum will be split into multiple iterations.
 };
 
 RWByteAddressBuffer gData;                      ///< Data buffer.
 RWByteAddressBuffer gPrefixGroupSums;           ///< One uint per group, each holds the sum of all elements in the group and to the left.
 RWByteAddressBuffer gTotalSum;                  ///< One uint, holds the total sum of a prefix sum iteration.
-ByteAddressBuffer gPrevTotalSum;                ///< One uint, holds the previous total sum of the previous prefix sum iteration.
 
 groupshared uint gSharedData[2 * GROUP_SIZE];   ///< Temporary working buffer in shared memory for 2N elements.
 
@@ -66,8 +65,7 @@ void groupScan(uint3 groupID : SV_GroupID, uint3 groupThreadID : SV_GroupThreadI
     // It's probably better to load one element into each half of the array as we do here.
     // We pad the data with zeros in shared memory if actual #elements is less than working set.
 
-    const uint prevSum = gPrevTotalSum.Load(0);
-    const uint idx = 2 * GROUP_SIZE * GROUP_SIZE * gIter + groupIdx * (2 * GROUP_SIZE) + thid;
+    const uint idx = 4 * GROUP_SIZE * GROUP_SIZE * gIter + groupIdx * (2 * GROUP_SIZE) + thid;
     uint prevData1 = (idx < gTotalNumElems ? gData.Load(idx * 4) : 0);
     uint prevData2 = ((idx + GROUP_SIZE) < gTotalNumElems ? gData.Load((idx + GROUP_SIZE) * 4) : 0);
     gSharedData[thid] = prevData1;
@@ -92,26 +90,6 @@ void groupScan(uint3 groupID : SV_GroupID, uint3 groupThreadID : SV_GroupThreadI
 
     GroupMemoryBarrierWithGroupSync();
 
-    // Compute prefix sum over groups.
-    // Since groups run out-of-order, we use atomics to add our group's sum to all relevent group sums.
-    // This can get slow for large inputs, but for moderate sized inputs (tens to hundreds of groups) it's probably still very fast.
-    // The alternative is to run an extra shader pass computing the prefix sum over the groups.
-    if (thid >= groupIdx && thid < gNumGroups)
-    {
-        uint sum = gSharedData[2 * GROUP_SIZE - 1];
-        gPrefixGroupSums.InterlockedAdd(thid * 4, sum);
-
-        // One thread per group also adds the group sum to the total sum.
-        if (thid == gNumGroups - 1)
-        {
-            gTotalSum.InterlockedAdd(0, sum);
-        }
-    }
-
-    GroupMemoryBarrierWithGroupSync();
-
-    // Zero out top element, this is required for down-sweep phase to work correctly.
-    // Only one thread in each group does this.
 
     // Down-sweep phase.
     // We do log2(N)+1 iterations for d = 1, 2, 4, ..., N.
@@ -132,43 +110,109 @@ void groupScan(uint3 groupID : SV_GroupID, uint3 groupThreadID : SV_GroupThreadI
 
     GroupMemoryBarrierWithGroupSync();
 
+    uint sum = gSharedData[2 * GROUP_SIZE - 1];
+    if (thid == GROUP_SIZE - 1)
+    {
+        gPrefixGroupSums.Store(groupIdx * 4, sum);
+    }
+
     // Write results to memory and add prev sum. Lower half first then upper half.
-    // uint leftGroupSum;
-    // if (groupIdx == 0) {
-    //     leftGroupSum = 0;
-    // } else {
-    //     leftGroupSum = gPrefixGroupSums.Load((groupIdx - 1)*4);
-    // }
-    // if (idx < gTotalNumElems) gData.Store(idx * 4, gSharedData[thid] + prevSum + leftGroupSum);
-    // if ((idx + GROUP_SIZE) < gTotalNumElems) gData.Store((idx + GROUP_SIZE) * 4, gSharedData[thid + GROUP_SIZE] + prevSum + leftGroupSum);
     if (idx < gTotalNumElems) {
         uint addr = idx * 4;
-        gData.Store(addr, gSharedData[thid] + prevSum - prevData1);
+        gData.Store(addr, gSharedData[thid]  - prevData1);
     }
     if ((idx + GROUP_SIZE) < gTotalNumElems) {
         uint addr = (idx + GROUP_SIZE) * 4;
-        gData.Store(addr, gSharedData[thid + GROUP_SIZE] + prevSum - prevData2);
+        gData.Store(addr, gSharedData[thid + GROUP_SIZE]  - prevData2);
+    }
+}
+
+[numthreads(GROUP_SIZE, 1, 1)]
+void interGroupSum(uint3 groupID: SV_GroupID, uint3 groupThreadID: SV_GroupThreadID)
+{
+    const uint thid = groupThreadID.x; // Local thread ID in the range 0..N-1.
+    const uint groupIdx = groupID.x;   // Group index where each group represents 2N elements.
+    
+    uint leftData, rightData;
+    if (thid < gNumGroups) {
+        leftData = gPrefixGroupSums.Load(thid * 4);
+    } else {
+        leftData = 0;
+    }
+    if (thid + GROUP_SIZE < gNumGroups) {
+        rightData = gPrefixGroupSums.Load((thid + GROUP_SIZE) * 4);
+    } else {
+        rightData = 0;
+    }
+    gSharedData[thid] = leftData;
+    gSharedData[thid + GROUP_SIZE] = rightData;
+    const uint prevIterSum = gTotalSum.Load(0);
+    // Reducation phase.
+    uint offset = 1;
+    for (uint d = GROUP_SIZE; d > 0; d >>= 1)
+    {
+        GroupMemoryBarrierWithGroupSync();
+
+        if (thid < d)
+        {
+            uint ai = offset * (2 * thid + 1) - 1;
+            uint bi = ai + offset;
+
+            gSharedData[bi] += gSharedData[ai];
+        }
+        offset <<= 1; // offset = 1, 2, ... N
+    }
+
+    // Down-sweep phase.
+    for (uint d = 1; d <= GROUP_SIZE; d *= 2)
+    {
+        offset >>= 1; // offset = N, N/2, ..., 1
+
+        GroupMemoryBarrierWithGroupSync();
+
+        if (thid < d - 1)
+        {
+            uint ai = offset * (2 * thid + 2) - 1;
+            uint bi = ai + offset;
+
+            gSharedData[bi] += gSharedData[ai];
+        }
+    }
+    GroupMemoryBarrierWithGroupSync();
+    if (thid < gNumGroups) {
+        uint addr = thid * 4;
+        gPrefixGroupSums.Store(addr, gSharedData[thid] - leftData + prevIterSum);
+        DeviceMemoryBarrierWithGroupSync();
+        if (thid == gNumGroups - 1) {
+            gTotalSum.Store(0, gSharedData[thid] + prevIterSum); // store total sum
+        }
+    }
+    if ((thid + GROUP_SIZE) < gNumGroups) {
+        uint addr = (thid + GROUP_SIZE) * 4;
+        gPrefixGroupSums.Store(addr, gSharedData[thid + GROUP_SIZE] - rightData + prevIterSum);
+        DeviceMemoryBarrierWithGroupSync();
+        if (thid + GROUP_SIZE == gNumGroups - 1) {
+            gTotalSum.Store(0, gSharedData[thid + GROUP_SIZE] + prevIterSum); // store total sum
+        }
     }
 }
 
 /** Pass for finalizing a prefix sum computed over multiple thread groups.
     Each thread here operates on one element of the data buffer.
-    Note that we're skipping the first N elements as those don't need to be added
     (their group's prefix sum is zero).
 */
 [numthreads(GROUP_SIZE, 1, 1)]
 void finalizeGroups(uint3 groupID : SV_GroupID, uint3 groupThreadID : SV_GroupThreadID)
 {
     const uint thid = groupThreadID.x;      // Local thread ID in the range 0..N-1.
-    const uint groupIdx = groupID.x;        // Group index where each group represents N elements (skipping first 2N elements).
-
-    uint sum = gPrefixGroupSums.Load((groupIdx >> 1) * 4);
-    uint globalIdx = (groupIdx * GROUP_SIZE) + thid + 2 * GROUP_SIZE * (1 + GROUP_SIZE * gIter);  // Skip first 2N elements.
+    const uint groupIdx = groupID.x;        // Group index where each group represents N elements.
+    uint interGroupPrefixSum = gPrefixGroupSums.Load((groupIdx >> 1) * 4);
+    uint globalIdx = (groupIdx * GROUP_SIZE) + thid + 2 * GROUP_SIZE * (2 * GROUP_SIZE * gIter); 
 
     if (globalIdx < gTotalNumElems)
     {
         uint addr = globalIdx * 4;
         uint elem = gData.Load(addr);
-        gData.Store(addr, elem + sum);
+        gData.Store(addr, elem + interGroupPrefixSum);
     }
 }

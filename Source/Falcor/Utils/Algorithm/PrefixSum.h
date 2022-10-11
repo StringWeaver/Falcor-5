@@ -68,6 +68,9 @@ namespace Falcor
         ComputeProgram::SharedPtr   mpPrefixSumGroupProgram;
         ComputeVars::SharedPtr      mpPrefixSumGroupVars;
 
+        ComputeProgram::SharedPtr   mpPrefixSumInterGroupSumProgram;
+        ComputeVars::SharedPtr      mpPrefixSumInterGroupSumVars;
+
         ComputeProgram::SharedPtr   mpPrefixSumFinalizeProgram;
         ComputeVars::SharedPtr      mpPrefixSumFinalizeVars;
 
