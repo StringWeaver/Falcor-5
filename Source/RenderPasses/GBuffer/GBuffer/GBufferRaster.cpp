@@ -141,7 +141,7 @@ void GBufferRaster::setScene(RenderContext* pRenderContext, const Scene::SharedP
         {
             throw RuntimeError("GBufferRaster: Requires triangle list geometry due to usage of SV_Barycentrics.");
         }
-
+        pScene->getCamera()->setNearPlane(1.0); //Avoid flickering due to inappropriate ZNear
         mRaster.pProgram->addDefines(pScene->getSceneDefines());
         mRaster.pProgram->setTypeConformances(pScene->getTypeConformances());
     }
