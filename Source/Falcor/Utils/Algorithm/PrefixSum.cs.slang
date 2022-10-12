@@ -90,6 +90,11 @@ void groupScan(uint3 groupID : SV_GroupID, uint3 groupThreadID : SV_GroupThreadI
 
     GroupMemoryBarrierWithGroupSync();
 
+    uint groupSum = gSharedData[2 * GROUP_SIZE - 1];
+    if (thid == GROUP_SIZE - 1)
+    {
+        gPrefixGroupSums.Store(groupIdx * 4, groupSum);
+    }
 
     // Down-sweep phase.
     // We do log2(N)+1 iterations for d = 1, 2, 4, ..., N.
@@ -110,12 +115,7 @@ void groupScan(uint3 groupID : SV_GroupID, uint3 groupThreadID : SV_GroupThreadI
 
     GroupMemoryBarrierWithGroupSync();
 
-    uint sum = gSharedData[2 * GROUP_SIZE - 1];
-    if (thid == GROUP_SIZE - 1)
-    {
-        gPrefixGroupSums.Store(groupIdx * 4, sum);
-    }
-
+    
     // Write results to memory and add prev sum. Lower half first then upper half.
     if (idx < gTotalNumElems) {
         uint addr = idx * 4;
@@ -132,7 +132,7 @@ void interGroupSum(uint3 groupID: SV_GroupID, uint3 groupThreadID: SV_GroupThrea
 {
     const uint thid = groupThreadID.x; // Local thread ID in the range 0..N-1.
     const uint groupIdx = groupID.x;   // Group index where each group represents 2N elements.
-    
+    const uint prevIterSum = gTotalSum.Load(0);
     uint leftData, rightData;
     if (thid < gNumGroups) {
         leftData = gPrefixGroupSums.Load(thid * 4);
@@ -146,7 +146,6 @@ void interGroupSum(uint3 groupID: SV_GroupID, uint3 groupThreadID: SV_GroupThrea
     }
     gSharedData[thid] = leftData;
     gSharedData[thid + GROUP_SIZE] = rightData;
-    const uint prevIterSum = gTotalSum.Load(0);
     // Reducation phase.
     uint offset = 1;
     for (uint d = GROUP_SIZE; d > 0; d >>= 1)
