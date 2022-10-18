@@ -49,7 +49,6 @@ private:
     SVGFPass(const Dictionary& dict);
 
     bool init(const Dictionary& dict);
-    void allocateFbos(uint2 dim, RenderContext* pRenderContext);
     void clearBuffers(RenderContext* pRenderContext, const RenderData& renderData);
 
     void computeLinearZAndNormal(RenderContext* pRenderContext, Texture::SharedPtr pLinearZTexture,

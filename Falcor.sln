@@ -119,6 +119,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ReSTIRGIGBuffer", "Source\R
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GlobalIlluminationPass", "Source\RenderPasses\GlobalIlluminationPass\GlobalIlluminationPass.vcxproj", "{38693E67-EB25-445E-9781-E000DD87001C}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PathTracerWithSVGF", "Source\RenderPasses\PathTracerWithSVGF\PathTracerWithSVGF.vcxproj", "{CC4DBD39-1C96-43F3-AFD9-EA3053FFE22A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -883,6 +885,22 @@ Global
 		{38693E67-EB25-445E-9781-E000DD87001C}.ReleaseGFX-D3D12|x64.Build.0 = Release|x64
 		{38693E67-EB25-445E-9781-E000DD87001C}.ReleaseGFX-VK|x64.ActiveCfg = Release|x64
 		{38693E67-EB25-445E-9781-E000DD87001C}.ReleaseGFX-VK|x64.Build.0 = Release|x64
+		{CC4DBD39-1C96-43F3-AFD9-EA3053FFE22A}.Debug|x64.ActiveCfg = Debug|x64
+		{CC4DBD39-1C96-43F3-AFD9-EA3053FFE22A}.Debug|x64.Build.0 = Debug|x64
+		{CC4DBD39-1C96-43F3-AFD9-EA3053FFE22A}.DebugD3D12|x64.ActiveCfg = Debug|x64
+		{CC4DBD39-1C96-43F3-AFD9-EA3053FFE22A}.DebugD3D12|x64.Build.0 = Debug|x64
+		{CC4DBD39-1C96-43F3-AFD9-EA3053FFE22A}.DebugGFX-D3D12|x64.ActiveCfg = Debug|x64
+		{CC4DBD39-1C96-43F3-AFD9-EA3053FFE22A}.DebugGFX-D3D12|x64.Build.0 = Debug|x64
+		{CC4DBD39-1C96-43F3-AFD9-EA3053FFE22A}.DebugGFX-VK|x64.ActiveCfg = Debug|x64
+		{CC4DBD39-1C96-43F3-AFD9-EA3053FFE22A}.DebugGFX-VK|x64.Build.0 = Debug|x64
+		{CC4DBD39-1C96-43F3-AFD9-EA3053FFE22A}.Release|x64.ActiveCfg = Release|x64
+		{CC4DBD39-1C96-43F3-AFD9-EA3053FFE22A}.Release|x64.Build.0 = Release|x64
+		{CC4DBD39-1C96-43F3-AFD9-EA3053FFE22A}.ReleaseD3D12|x64.ActiveCfg = Release|x64
+		{CC4DBD39-1C96-43F3-AFD9-EA3053FFE22A}.ReleaseD3D12|x64.Build.0 = Release|x64
+		{CC4DBD39-1C96-43F3-AFD9-EA3053FFE22A}.ReleaseGFX-D3D12|x64.ActiveCfg = Release|x64
+		{CC4DBD39-1C96-43F3-AFD9-EA3053FFE22A}.ReleaseGFX-D3D12|x64.Build.0 = Release|x64
+		{CC4DBD39-1C96-43F3-AFD9-EA3053FFE22A}.ReleaseGFX-VK|x64.ActiveCfg = Release|x64
+		{CC4DBD39-1C96-43F3-AFD9-EA3053FFE22A}.ReleaseGFX-VK|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
