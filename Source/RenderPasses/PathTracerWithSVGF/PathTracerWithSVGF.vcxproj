@@ -34,6 +34,12 @@
     <ProjectReference Include="..\..\Falcor\Falcor.vcxproj">
       <Project>{2c535635-e4c5-4098-a928-574f0e7cd5f9}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\PathTracer\PathTracer.vcxproj">
+      <Project>{99799ba5-6503-425c-bfcc-8b94e6a40d1d}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\SVGFPass\SVGFPass.vcxproj">
+      <Project>{691f64dd-0941-49de-b52e-949341192154}</Project>
+    </ProjectReference>
   </ItemGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>

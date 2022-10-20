@@ -230,6 +230,7 @@ PathTracer::PathTracer(const Dictionary& dict)
 
     parseDictionary(dict);
     validateOptions();
+    validateOptions();
 
     // Create sample generator.
     mpSampleGenerator = SampleGenerator::create(mStaticParams.sampleGenerator);

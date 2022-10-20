@@ -26,6 +26,11 @@
  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **************************************************************************/
 #pragma once
+#ifdef BUILD_PT_PASS
+#define PASS_API FALCOR_API_EXPORT
+#else
+#define PASS_API FALCOR_API_IMPORT
+#endif
 #include "Falcor.h"
 #include "Utils/Debug/PixelDebug.h"
 #include "Utils/Sampling/SampleGenerator.h"
@@ -42,7 +47,7 @@ using namespace Falcor;
 
 /** Fast path tracer.
 */
-class PathTracer : public RenderPass
+class PASS_API PathTracer : public RenderPass
 {
 public:
     using SharedPtr = std::shared_ptr<PathTracer>;
