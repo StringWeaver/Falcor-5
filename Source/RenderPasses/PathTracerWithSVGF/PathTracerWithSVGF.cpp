@@ -58,23 +58,27 @@ extern "C" FALCOR_API_EXPORT void getPasses(Falcor::RenderPassLibrary& lib)
 PathTracerWithSVGF::SharedPtr PathTracerWithSVGF::create(RenderContext* pRenderContext, const Dictionary& dict)
 {
     SharedPtr pPass = SharedPtr(new PathTracerWithSVGF());
-    pPass->mDict = dict;
+    Dictionary pathtracerPassDict{}; //TODO
+    Dictionary svgfPassDict{}; //TODO
+    pPass->mpPathTracerPass = PathTracer::create(pRenderContext, pathtracerPassDict);
+    pPass->mpSVGFPass = SVGFPass::create(pRenderContext,svgfPassDict);
     return pPass;
 }
 void PathTracerWithSVGF::compile(RenderContext* pRenderContext, const CompileData& compileData) {
     mpRenderGraph = RenderGraph::create("PathTracerWithSVGF Pass");
-    mpPathTracerPass = PathTracer::create(pRenderContext, mDict);
-    mpSVGFPass = SVGFPass::create();
     mpRenderGraph->addPass(mpPathTracerPass, "PathTracer");
     mpRenderGraph->addPass(mpSVGFPass, "SVGFPass");
-    mpRenderGraph->addEdge("PathTracer.color", "SVGFPass.color");
+    mpRenderGraph->addEdge("PathTracer.color", "SVGFPass.Color");
     mpRenderGraph->markOutput("SVGFPass.Filtered image");
     mpRenderGraph->setScene(mpScene);
 }
 
 Dictionary PathTracerWithSVGF::getScriptingDictionary()
 {
-    return Dictionary();
+    auto pathtracerPassDict = mpPathTracerPass->getScriptingDictionary();
+    auto svgfPassDict = mpSVGFPass->getScriptingDictionary();
+    Dictionary dict{}; //TODO
+    return dict;
 }
 
 RenderPassReflection PathTracerWithSVGF::reflect(const CompileData& compileData)
@@ -130,4 +134,6 @@ void PathTracerWithSVGF::execute(RenderContext* pRenderContext, const RenderData
 
 void PathTracerWithSVGF::renderUI(Gui::Widgets& widget)
 {
+    mpPathTracerPass->renderUI(widget);
+    mpSVGFPass->renderUI(widget);
 }
