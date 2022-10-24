@@ -58,10 +58,8 @@ extern "C" FALCOR_API_EXPORT void getPasses(Falcor::RenderPassLibrary& lib)
 PathTracerWithSVGF::SharedPtr PathTracerWithSVGF::create(RenderContext* pRenderContext, const Dictionary& dict)
 {
     SharedPtr pPass = SharedPtr(new PathTracerWithSVGF());
-    Dictionary pathtracerPassDict{}; //TODO
-    Dictionary svgfPassDict{}; //TODO
-    pPass->mpPathTracerPass = PathTracer::create(pRenderContext, pathtracerPassDict);
-    pPass->mpSVGFPass = SVGFPass::create(pRenderContext,svgfPassDict);
+    pPass->mpPathTracerPass = PathTracer::create(pRenderContext, dict);
+    pPass->mpSVGFPass = SVGFPass::create(pRenderContext,dict);
     return pPass;
 }
 void PathTracerWithSVGF::compile(RenderContext* pRenderContext, const CompileData& compileData) {
@@ -75,10 +73,10 @@ void PathTracerWithSVGF::compile(RenderContext* pRenderContext, const CompileDat
 
 Dictionary PathTracerWithSVGF::getScriptingDictionary()
 {
-    auto pathtracerPassDict = mpPathTracerPass->getScriptingDictionary();
-    auto svgfPassDict = mpSVGFPass->getScriptingDictionary();
-    Dictionary dict{}; //TODO
-    return dict;
+    auto pathtracerPassDict = mpPathTracerPass->getScriptingDictionary().toPython();
+    auto svgfPassDict = mpSVGFPass->getScriptingDictionary().toPython();
+    auto dict = pathtracerPassDict + svgfPassDict;
+    return Dictionary(dict);
 }
 
 RenderPassReflection PathTracerWithSVGF::reflect(const CompileData& compileData)
