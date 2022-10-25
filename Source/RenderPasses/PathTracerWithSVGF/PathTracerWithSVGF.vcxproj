@@ -41,6 +41,9 @@
       <Project>{691f64dd-0941-49de-b52e-949341192154}</Project>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup>
+    <ShaderSource Include="ComputeSampleCount.ps.slang" />
+  </ItemGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>

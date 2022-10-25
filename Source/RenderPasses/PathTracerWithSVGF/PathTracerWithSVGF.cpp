@@ -29,6 +29,9 @@
 
 const RenderPass::Info PathTracerWithSVGF::kInfo { "PathTracerWithSVGF", "This pass use SVGF to guide samping of Pathtracer." };
 namespace {
+
+    const char kSampleCountShader[] = "RenderPasses/PathTracerWithSVGF/ComputeSampleCount.ps.slang";
+
     // SVGF Input buffer names
     const char kInputBufferDiffuseReflectance[] = "DiffuseReflectance";
     const char kInputBufferSpecularReflectance[] = "SpecularReflectance";
@@ -42,6 +45,9 @@ namespace {
     // PathTracer Input buffer names
     const std::string kInputVBuffer = "vbuffer";
     const std::string kOutputColor = "color";
+
+    const char kInternalBufferPreviousVariance[] = "PreviousVariance";
+    //const char kInternalBufferSampleCount[] = "SampleCount";
 
 }
 // Don't remove this. it's required for hot-reload to function properly
@@ -60,9 +66,19 @@ PathTracerWithSVGF::SharedPtr PathTracerWithSVGF::create(RenderContext* pRenderC
     SharedPtr pPass = SharedPtr(new PathTracerWithSVGF());
     pPass->mpPathTracerPass = PathTracer::create(pRenderContext, dict);
     pPass->mpSVGFPass = SVGFPass::create(pRenderContext,dict);
+    pPass->mpSampleCountPass = FullScreenPass::create(kSampleCountShader);
+    FALCOR_ASSERT(pPass->mpPathTracerPass && pPass->mpSVGFPass && pPass->mpSampleCountPass);
     return pPass;
 }
 void PathTracerWithSVGF::compile(RenderContext* pRenderContext, const CompileData& compileData) {
+
+    uint2 dim = compileData.defaultTexDims;
+    Fbo::Desc desc;
+    desc.setSampleCount(0);
+    desc.setColorTarget(0, Falcor::ResourceFormat::R8Uint); //sample count
+    mpFbo = Fbo::create2D(dim.x, dim.y, desc);
+    mIsFirstFrame = true;
+
     mpRenderGraph = RenderGraph::create("PathTracerWithSVGF Pass");
     mpRenderGraph->addPass(mpPathTracerPass, "PathTracer");
     mpRenderGraph->addPass(mpSVGFPass, "SVGFPass");
@@ -94,6 +110,12 @@ RenderPassReflection PathTracerWithSVGF::reflect(const CompileData& compileData)
     reflector.addInput(kInputBufferLinearZ, "LinearZ");
     reflector.addInput(kInputBufferMotionVector, "Motion vectors");
     reflector.addOutput(kOutputColor, "color").format(ResourceFormat::RGBA32Float);
+    reflector.addInternal(kInternalBufferPreviousVariance, "Previous Variance")
+        .format(ResourceFormat::R16Float)
+        .bindFlags(Resource::BindFlags::ShaderResource);
+    //reflector.addInternal(kInternalBufferSampleCount, "Sample Count")
+    //    .format(ResourceFormat::R8Uint)
+    //    .bindFlags(Resource::BindFlags::RenderTarget);
     return reflector;
 }
 void PathTracerWithSVGF::setScene(RenderContext* pRenderContext, const Scene::SharedPtr& pScene) {
@@ -115,6 +137,20 @@ void PathTracerWithSVGF::execute(RenderContext* pRenderContext, const RenderData
     auto pPosNormalFwidth = renderData[kInputBufferPosNormalFwidth]->asTexture();
     auto pLinearZ = renderData[kInputBufferLinearZ]->asTexture();
     auto pMotionVector = renderData[kInputBufferMotionVector]->asTexture();
+
+    auto pPreviousVariance = renderData[kInternalBufferPreviousVariance]->asTexture();
+
+    FALCOR_ASSERT(mpFbo && mpFbo->getWidth() == pPreviousVariance->getWidth() && mpFbo->getHeight() == pPreviousVariance->getHeight());
+
+    auto perImageCB = mpSampleCountPass["PerImageCB"];
+    perImageCB["gPrevVariance"] = pPreviousVariance;
+    perImageCB["gIsFirstFrame"] = mIsFirstFrame;
+
+
+
+
+    mIsFirstFrame = false;
+
     mpRenderGraph->setInput("PathTracer.vbuffer", pVBuffer);
     mpRenderGraph->setInput("SVGFPass.DiffuseReflectance", pDiffuseReflectance);
     mpRenderGraph->setInput("SVGFPass.SpecularReflectance", pSpecularReflectance);

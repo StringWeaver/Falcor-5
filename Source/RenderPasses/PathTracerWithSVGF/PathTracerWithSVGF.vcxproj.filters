@@ -6,4 +6,7 @@
   <ItemGroup>
     <ClInclude Include="PathTracerWithSVGF.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ShaderSource Include="ComputeSampleCount.ps.slang" />
+  </ItemGroup>
 </Project>

@@ -60,6 +60,9 @@ private:
     RenderGraph::SharedPtr mpRenderGraph;
     PathTracer::SharedPtr mpPathTracerPass;
     SVGFPass::SharedPtr mpSVGFPass;
+    FullScreenPass::SharedPtr mpSampleCountPass;
     Dictionary mDict;
     Scene::SharedPtr mpScene;
+    Fbo::SharedPtr mpFbo;
+    bool mIsFirstFrame;
 };
