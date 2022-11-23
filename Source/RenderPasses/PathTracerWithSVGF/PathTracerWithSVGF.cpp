@@ -31,7 +31,11 @@ const RenderPass::Info PathTracerWithSVGF::kInfo { "PathTracerWithSVGF", "This p
 namespace {
 
     const char kSampleCountShader[] = "RenderPasses/PathTracerWithSVGF/ComputeSampleCount.ps.slang";
-
+    // Scripting options.
+    const std::string kUseAdaptiveSampling = "useAdaptiveSampling";
+    // Subpass dictionary names
+    const std::string kPathTracerPassDict = "PathTracerPassDict";
+    const std::string kSVGFPassDict = "SVGFPassDict";
     // SVGF Input buffer names
     const char kInputBufferDiffuseReflectance[] = "DiffuseReflectance";
     const char kInputBufferSpecularReflectance[] = "SpecularReflectance";
@@ -45,9 +49,9 @@ namespace {
     // PathTracer Input buffer names
     const std::string kInputVBuffer = "vbuffer";
     const std::string kOutputColor = "color";
-
+    //Internal buffer names
     const char kInternalBufferPreviousVariance[] = "PreviousVariance";
-    //const char kInternalBufferSampleCount[] = "SampleCount";
+    const char kInternalBufferSampleCount[] = "SampleCount";
 
 }
 // Don't remove this. it's required for hot-reload to function properly
@@ -64,8 +68,18 @@ extern "C" FALCOR_API_EXPORT void getPasses(Falcor::RenderPassLibrary& lib)
 PathTracerWithSVGF::SharedPtr PathTracerWithSVGF::create(RenderContext* pRenderContext, const Dictionary& dict)
 {
     SharedPtr pPass = SharedPtr(new PathTracerWithSVGF());
-    pPass->mpPathTracerPass = PathTracer::create(pRenderContext, dict);
-    pPass->mpSVGFPass = SVGFPass::create(pRenderContext,dict);
+    Dictionary PathTracerPassDict;
+    Dictionary SVGFPassDict;
+    for (const auto& [key, value] : dict)
+    {
+        for (const auto& [key, value] : dict)
+        {
+            if (key == kUseAdaptiveSampling) pPass->mUseAdaptiveSampling = value;
+            else logWarning("Unknown field '{}' in PathTracerWithSVGF dictionary.", key);
+        }
+    }
+    pPass->mpPathTracerPass = PathTracer::create(pRenderContext,PathTracerPassDict);
+    pPass->mpSVGFPass = SVGFPass::create(pRenderContext,SVGFPassDict);
     pPass->mpSampleCountPass = FullScreenPass::create(kSampleCountShader);
     FALCOR_ASSERT(pPass->mpPathTracerPass && pPass->mpSVGFPass && pPass->mpSampleCountPass);
     return pPass;
@@ -75,7 +89,6 @@ void PathTracerWithSVGF::compile(RenderContext* pRenderContext, const CompileDat
     uint2 dim = compileData.defaultTexDims;
     Fbo::Desc desc;
     desc.setSampleCount(0);
-    desc.setColorTarget(0, Falcor::ResourceFormat::R8Uint); //sample count
     mpFbo = Fbo::create2D(dim.x, dim.y, desc);
     mIsFirstFrame = true;
 
@@ -84,15 +97,17 @@ void PathTracerWithSVGF::compile(RenderContext* pRenderContext, const CompileDat
     mpRenderGraph->addPass(mpSVGFPass, "SVGFPass");
     mpRenderGraph->addEdge("PathTracer.color", "SVGFPass.Color");
     mpRenderGraph->markOutput("SVGFPass.Filtered image");
+    mpRenderGraph->markOutput("SVGFPass.Variance");
     mpRenderGraph->setScene(mpScene);
 }
 
 Dictionary PathTracerWithSVGF::getScriptingDictionary()
 {
-    auto pathtracerPassDict = mpPathTracerPass->getScriptingDictionary().toPython();
-    auto svgfPassDict = mpSVGFPass->getScriptingDictionary().toPython();
-    auto dict = pathtracerPassDict + svgfPassDict;
-    return Dictionary(dict);
+    auto pathtracerPassDict = mpPathTracerPass->getScriptingDictionary();
+    auto svgfPassDict = mpSVGFPass->getScriptingDictionary();
+    Dictionary dict;
+    dict[kUseAdaptiveSampling] = mUseAdaptiveSampling;
+    return dict;
 }
 
 RenderPassReflection PathTracerWithSVGF::reflect(const CompileData& compileData)
@@ -113,9 +128,9 @@ RenderPassReflection PathTracerWithSVGF::reflect(const CompileData& compileData)
     reflector.addInternal(kInternalBufferPreviousVariance, "Previous Variance")
         .format(ResourceFormat::R16Float)
         .bindFlags(Resource::BindFlags::ShaderResource);
-    //reflector.addInternal(kInternalBufferSampleCount, "Sample Count")
-    //    .format(ResourceFormat::R8Uint)
-    //    .bindFlags(Resource::BindFlags::RenderTarget);
+    reflector.addInternal(kInternalBufferSampleCount, "Sample Count")
+        .format(ResourceFormat::R8Uint)
+        .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
     return reflector;
 }
 void PathTracerWithSVGF::setScene(RenderContext* pRenderContext, const Scene::SharedPtr& pScene) {
@@ -128,6 +143,7 @@ void PathTracerWithSVGF::execute(RenderContext* pRenderContext, const RenderData
     // renderData holds the requested resources
     // auto& pTexture = renderData["src"]->asTexture();
     if (!mpScene) return;
+
     auto pVBuffer = renderData[kInputVBuffer]->asTexture();
     auto pDiffuseReflectance = renderData[kInputBufferDiffuseReflectance]->asTexture();
     auto pSpecularReflectance = renderData[kInputBufferSpecularReflectance]->asTexture();
@@ -137,21 +153,27 @@ void PathTracerWithSVGF::execute(RenderContext* pRenderContext, const RenderData
     auto pPosNormalFwidth = renderData[kInputBufferPosNormalFwidth]->asTexture();
     auto pLinearZ = renderData[kInputBufferLinearZ]->asTexture();
     auto pMotionVector = renderData[kInputBufferMotionVector]->asTexture();
-
     auto pPreviousVariance = renderData[kInternalBufferPreviousVariance]->asTexture();
+    auto pSampleCount = renderData[kInternalBufferSampleCount]->asTexture();
 
-    FALCOR_ASSERT(mpFbo && mpFbo->getWidth() == pPreviousVariance->getWidth() && mpFbo->getHeight() == pPreviousVariance->getHeight());
-
-    auto perImageCB = mpSampleCountPass["PerImageCB"];
-    perImageCB["gPrevVariance"] = pPreviousVariance;
-    perImageCB["gIsFirstFrame"] = mIsFirstFrame;
-
-
-
-
-    mIsFirstFrame = false;
+    FALCOR_ASSERT(mpFbo);
+    mpFbo->attachColorTarget(pSampleCount, 0); //set sampleCount as render target
+    FALCOR_ASSERT(mpFbo->getWidth() == pSampleCount->getWidth() && mpFbo->getHeight() == pSampleCount->getHeight());
+    FALCOR_ASSERT(mpFbo->getWidth() == pPreviousVariance->getWidth() && mpFbo->getHeight() == pPreviousVariance->getHeight());
+    if (mUseAdaptiveSampling) {
+        auto perImageCB = mpSampleCountPass["PerImageCB"];
+        perImageCB["gPrevVariance"] = pPreviousVariance;
+        perImageCB["gMotion"] = pMotionVector;
+        perImageCB["gIsFirstFrame"] = mIsFirstFrame;
+        mpSampleCountPass->execute(pRenderContext, mpFbo);
+        mIsFirstFrame = false;
+    }
+    else {
+        pRenderContext->clearTexture(pSampleCount.get(),uint4(1,0,0,0));
+    }
 
     mpRenderGraph->setInput("PathTracer.vbuffer", pVBuffer);
+    mpRenderGraph->setInput("PathTracer.sampleCount", pSampleCount);
     mpRenderGraph->setInput("SVGFPass.DiffuseReflectance", pDiffuseReflectance);
     mpRenderGraph->setInput("SVGFPass.SpecularReflectance", pSpecularReflectance);
     mpRenderGraph->setInput("SVGFPass.Emission", pEmission);
@@ -162,12 +184,15 @@ void PathTracerWithSVGF::execute(RenderContext* pRenderContext, const RenderData
     mpRenderGraph->setInput("SVGFPass.MotionVec", pMotionVector);
     mpRenderGraph->execute(pRenderContext);
     auto pSVGFOutColor = mpRenderGraph->getOutput("SVGFPass.Filtered image")->asTexture();
+    auto pSVGFPrevVariance = mpRenderGraph->getOutput("SVGFPass.Variance")->asTexture();
     auto pOutColor = renderData[kOutputColor]->asTexture();
     pRenderContext->copyResource(pOutColor.get(), pSVGFOutColor.get());
+    pRenderContext->copyResource(pPreviousVariance.get(), pSVGFPrevVariance.get());
 }
 
 void PathTracerWithSVGF::renderUI(Gui::Widgets& widget)
 {
+    widget.checkbox("Enable Adaptive Sampling", mUseAdaptiveSampling);
     mpPathTracerPass->renderUI(widget);
     mpSVGFPass->renderUI(widget);
 }
