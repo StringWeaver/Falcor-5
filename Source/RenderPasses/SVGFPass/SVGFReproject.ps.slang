@@ -151,7 +151,7 @@ bool loadPrevData(float2 posH, out float4 prevIllum, out float2 prevMoments, out
             valid = true;
             prevIllum   /= nValid;
             prevMoments /= nValid;
-            historyLength /= valid;
+            historyLength /= nValid;
         }
     }
 
