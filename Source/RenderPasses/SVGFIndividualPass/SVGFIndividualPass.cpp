@@ -25,7 +25,7 @@
  # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **************************************************************************/
-#include "SVGFPass.h"
+#include "SVGFIndividualPass.h"
 
 /*
 TODO:
@@ -35,16 +35,16 @@ TODO:
 - enum for fbo channel indices
 */
 
-const RenderPass::Info SVGFPass::kInfo { "SVGFPass", "SVGF denoising pass." };
+const RenderPass::Info SVGFIndividualPass::kInfo { "SVGFIndividualPass", "SVGF denoising pass for individual path type components." };
 
 namespace
 {
     // Shader source files
-    const char kPackLinearZAndNormalShader[] = "RenderPasses/SVGFPass/SVGFPackLinearZAndNormal.ps.slang";
-    const char kReprojectShader[]            = "RenderPasses/SVGFPass/SVGFReproject.ps.slang";
-    const char kAtrousShader[]               = "RenderPasses/SVGFPass/SVGFAtrous.ps.slang";
-    const char kFilterMomentShader[]         = "RenderPasses/SVGFPass/SVGFFilterMoments.ps.slang";
-    const char kFinalModulateShader[]        = "RenderPasses/SVGFPass/SVGFFinalModulate.ps.slang";
+    const char kPackLinearZAndNormalShader[] = "RenderPasses/SVGFIndividualPass/SVGFPackLinearZAndNormal.ps.slang";
+    const char kReprojectShader[]            = "RenderPasses/SVGFIndividualPass/SVGFReproject.ps.slang";
+    const char kAtrousShader[]               = "RenderPasses/SVGFIndividualPass/SVGFAtrous.ps.slang";
+    const char kFilterMomentShader[]         = "RenderPasses/SVGFIndividualPass/SVGFFilterMoments.ps.slang";
+    const char kFinalModulateShader[]        = "RenderPasses/SVGFIndividualPass/SVGFFinalModulate.ps.slang";
 
     // Names of valid entries in the parameter dictionary.
     const char kEnabled[] = "Enabled";
@@ -86,15 +86,15 @@ extern "C" FALCOR_API_EXPORT const char* getProjDir()
 
 extern "C" FALCOR_API_EXPORT void getPasses(Falcor::RenderPassLibrary& lib)
 {
-    lib.registerPass(SVGFPass::kInfo, SVGFPass::create);
+    lib.registerPass(SVGFIndividualPass::kInfo, SVGFIndividualPass::create);
 }
 
-SVGFPass::SharedPtr SVGFPass::create(RenderContext* pRenderContext, const Dictionary& dict)
+SVGFIndividualPass::SharedPtr SVGFIndividualPass::create(RenderContext* pRenderContext, const Dictionary& dict)
 {
-    return SharedPtr(new SVGFPass(dict));
+    return SharedPtr(new SVGFIndividualPass(dict));
 }
 
-SVGFPass::SVGFPass(const Dictionary& dict)
+SVGFIndividualPass::SVGFIndividualPass(const Dictionary& dict)
     : RenderPass(kInfo)
 {
     for (const auto& [key, value] : dict)
@@ -107,7 +107,7 @@ SVGFPass::SVGFPass(const Dictionary& dict)
         else if (key == kPhiNormal) mPhiNormal = value;
         else if (key == kAlpha) mAlpha = value;
         else if (key == kMomentsAlpha) mMomentsAlpha = value;
-        else logWarning("Unknown field '{}' in SVGFPass dictionary.", key);
+        else logWarning("Unknown field '{}' in SVGFIndividualPass dictionary.", key);
     }
 
     mpPackLinearZAndNormal = FullScreenPass::create(kPackLinearZAndNormalShader);
@@ -118,7 +118,7 @@ SVGFPass::SVGFPass(const Dictionary& dict)
     FALCOR_ASSERT(mpPackLinearZAndNormal && mpReprojection && mpAtrous && mpFilterMoments && mpFinalModulate);
 }
 
-Dictionary SVGFPass::getScriptingDictionary()
+Dictionary SVGFIndividualPass::getScriptingDictionary()
 {
     Dictionary dict;
     dict[kEnabled] = mFilterEnabled;
@@ -144,7 +144,7 @@ a-trous:
   - returns: final color
 */
 
-RenderPassReflection SVGFPass::reflect(const CompileData& compileData)
+RenderPassReflection SVGFIndividualPass::reflect(const CompileData& compileData)
 {
     RenderPassReflection reflector;
 
@@ -175,7 +175,7 @@ RenderPassReflection SVGFPass::reflect(const CompileData& compileData)
     return reflector;
 }
 
-void SVGFPass::compile(RenderContext* pRenderContext, const CompileData& compileData)
+void SVGFIndividualPass::compile(RenderContext* pRenderContext, const CompileData& compileData)
 {
     uint2 dim = compileData.defaultTexDims;
     {
@@ -212,7 +212,7 @@ void SVGFPass::compile(RenderContext* pRenderContext, const CompileData& compile
     mBuffersNeedClear = true;
 }
 
-void SVGFPass::execute(RenderContext* pRenderContext, const RenderData& renderData)
+void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData& renderData)
 {
     Texture::SharedPtr pDiffuseReflectanceTexture = renderData[kInputBufferDiffuseReflectance]->asTexture();
     Texture::SharedPtr pSpecularReflectanceTexture = renderData[kInputBufferSpecularReflectance]->asTexture();
@@ -294,7 +294,7 @@ void SVGFPass::execute(RenderContext* pRenderContext, const RenderData& renderDa
 
 
 
-void SVGFPass::clearBuffers(RenderContext* pRenderContext, const RenderData& renderData)
+void SVGFIndividualPass::clearBuffers(RenderContext* pRenderContext, const RenderData& renderData)
 {
     pRenderContext->clearFbo(mpPingPongFbo[0].get(), float4(0), 1.0f, 0, FboAttachmentType::All);
     pRenderContext->clearFbo(mpPingPongFbo[1].get(), float4(0), 1.0f, 0, FboAttachmentType::All);
@@ -314,7 +314,7 @@ void SVGFPass::clearBuffers(RenderContext* pRenderContext, const RenderData& ren
 // (It's slightly wasteful to copy linear z here, but having this all
 // together in a single buffer is a small simplification, since we make a
 // copy of it to refer to in the next frame.)
-void SVGFPass::computeLinearZAndNormal(RenderContext* pRenderContext, Texture::SharedPtr pLinearZTexture,
+void SVGFIndividualPass::computeLinearZAndNormal(RenderContext* pRenderContext, Texture::SharedPtr pLinearZTexture,
                                        Texture::SharedPtr pWorldNormalTexture)
 {
     auto perImageCB = mpPackLinearZAndNormal["PerImageCB"];
@@ -324,7 +324,7 @@ void SVGFPass::computeLinearZAndNormal(RenderContext* pRenderContext, Texture::S
     mpPackLinearZAndNormal->execute(pRenderContext, mpLinearZAndNormalFbo);
 }
 
-void SVGFPass::computeReprojection(RenderContext* pRenderContext, Texture::SharedPtr pDiffuseReflectanceTexture, Texture::SharedPtr pSpecularReflectanceTexture,
+void SVGFIndividualPass::computeReprojection(RenderContext* pRenderContext, Texture::SharedPtr pDiffuseReflectanceTexture, Texture::SharedPtr pSpecularReflectanceTexture,
                                    Texture::SharedPtr pColorTexture, Texture::SharedPtr pEmissionTexture,
                                    Texture::SharedPtr pMotionVectorTexture,
                                    Texture::SharedPtr pPositionNormalFwidthTexture,
@@ -352,7 +352,7 @@ void SVGFPass::computeReprojection(RenderContext* pRenderContext, Texture::Share
     mpReprojection->execute(pRenderContext, mpCurReprojFbo);
 }
 
-void SVGFPass::computeFilteredMoments(RenderContext* pRenderContext)
+void SVGFIndividualPass::computeFilteredMoments(RenderContext* pRenderContext)
 {
     auto perImageCB = mpFilterMoments["PerImageCB"];
 
@@ -367,7 +367,7 @@ void SVGFPass::computeFilteredMoments(RenderContext* pRenderContext)
     mpFilterMoments->execute(pRenderContext, mpPingPongFbo[0]);
 }
 
-void SVGFPass::computeAtrousDecomposition(RenderContext* pRenderContext, Texture::SharedPtr pDiffuseReflectanceTexture, Texture::SharedPtr pSpecularReflectanceTexture)
+void SVGFIndividualPass::computeAtrousDecomposition(RenderContext* pRenderContext, Texture::SharedPtr pDiffuseReflectanceTexture, Texture::SharedPtr pSpecularReflectanceTexture)
 {
     auto perImageCB = mpAtrous["PerImageCB"];
     perImageCB["gHistoryLength"] = mpCurReprojFbo->getColorTexture(2);
@@ -400,7 +400,7 @@ void SVGFPass::computeAtrousDecomposition(RenderContext* pRenderContext, Texture
     }
 }
 
-void SVGFPass::renderUI(Gui::Widgets& widget)
+void SVGFIndividualPass::renderUI(Gui::Widgets& widget)
 {
     int dirty = 0;
     dirty |= (int)widget.checkbox("Enable SVGF", mFilterEnabled);

@@ -27,17 +27,12 @@
  **************************************************************************/
 #pragma once
 #include "Falcor.h"
-#ifdef BUILD_SVGF_PASS
-#define PASS_API FALCOR_API_EXPORT
-#else
-#define PASS_API FALCOR_API_IMPORT
-#endif
 using namespace Falcor;
 
-class PASS_API SVGFPass : public RenderPass
+class SVGFIndividualPass : public RenderPass
 {
 public:
-    using SharedPtr = std::shared_ptr<SVGFPass>;
+    using SharedPtr = std::shared_ptr<SVGFIndividualPass>;
 
     static const Info kInfo;
 
@@ -50,7 +45,7 @@ public:
     virtual void renderUI(Gui::Widgets& widget) override;
 
 private:
-    SVGFPass(const Dictionary& dict);
+    SVGFIndividualPass(const Dictionary& dict);
 
     bool init(const Dictionary& dict);
     void clearBuffers(RenderContext* pRenderContext, const RenderData& renderData);
