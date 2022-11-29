@@ -63,7 +63,8 @@ private:
     FullScreenPass::SharedPtr mpSampleCountPass;
     Scene::SharedPtr mpScene;
     Fbo::SharedPtr mpFbo;
-    bool mIsFirstFrame;
     bool mUseAdaptiveSampling = true;
-    
+    uint32_t mFixedSpp = 1;
+    float mThreshold2spp = 0.05f;
+    float mThreshold3spp = 0.3f;
 };

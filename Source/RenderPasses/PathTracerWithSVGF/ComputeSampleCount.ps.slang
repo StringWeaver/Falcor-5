@@ -2,7 +2,10 @@ cbuffer PerImageCB
 {
 	Texture2D gPrevVariance;
 	Texture2D gMotion;
-	bool gIsFirstFrame;
+    float gThreshold2spp;
+    float gThreshold3spp;
+    bool gUseAdaptiveSampling;
+    uint gFixedSpp;
 }
 struct FullScreenPassVsOut
 {
@@ -39,10 +42,19 @@ PS_OUT main(FullScreenPassVsOut vsOut){
     const float2 posPrev = posH.xy + motion.xy * imageDim;
     const int2 iposPrev = int2(posPrev);
     PS_OUT psOut;
-    if (!gIsFirstFrame && isReprjValid(iposPrev)) {
-        const float t1 = 0.0;
-        const float t2 = 4.0;
-        psOut.outSampleCount = uint(lerp(1.0, 3.0, smoothstep(t1, t2, gPrevVariance[iposPrev].r)));
+    if(!gUseAdaptiveSampling){
+        psOut.outSampleCount = gFixedSpp;
+    }
+    else if (isReprjValid(iposPrev)) {
+        //psOut.outSampleCount = uint(lerp(1.0, 3.0, smoothstep(t1, t2, gPrevVariance[iposPrev].r)));
+        float variance = gPrevVariance[iposPrev].r;
+        if(variance<gThreshold2spp){
+            psOut.outSampleCount = 1;
+        }else if(variance<gThreshold3spp){
+            psOut.outSampleCount = 2;
+        }else{
+            psOut.outSampleCount = 3;
+        }
     } else {
         psOut.outSampleCount = 2;
 	}

@@ -370,9 +370,6 @@ void SVGFPass::computeFilteredMoments(RenderContext* pRenderContext)
 void SVGFPass::computeAtrousDecomposition(RenderContext* pRenderContext, Texture::SharedPtr pDiffuseReflectanceTexture, Texture::SharedPtr pSpecularReflectanceTexture)
 {
     auto perImageCB = mpAtrous["PerImageCB"];
-
-    perImageCB["gDiffuseReflectance"] = pDiffuseReflectanceTexture;
-    perImageCB["gSpecularReflectance"] = pSpecularReflectanceTexture;
     perImageCB["gHistoryLength"] = mpCurReprojFbo->getColorTexture(2);
     perImageCB["gLinearZAndNormal"]       = mpLinearZAndNormalFbo->getColorTexture(0);
 

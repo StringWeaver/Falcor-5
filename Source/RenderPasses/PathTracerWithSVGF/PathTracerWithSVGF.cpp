@@ -33,6 +33,9 @@ namespace {
     const char kSampleCountShader[] = "RenderPasses/PathTracerWithSVGF/ComputeSampleCount.ps.slang";
     // Scripting options.
     const std::string kUseAdaptiveSampling = "useAdaptiveSampling";
+    const std::string kFixedSpp = "FixedSpp";
+    const std::string k2SppThreshold = "2SppThreshold";
+    const std::string k3SppThreshold = "3SppThreshold";
     // Subpass dictionary names
     const std::string kPathTracerPassDict = "PathTracerPassDict";
     const std::string kSVGFPassDict = "SVGFPassDict";
@@ -75,6 +78,9 @@ PathTracerWithSVGF::SharedPtr PathTracerWithSVGF::create(RenderContext* pRenderC
         for (const auto& [key, value] : dict)
         {
             if (key == kUseAdaptiveSampling) pPass->mUseAdaptiveSampling = value;
+            else if (key == kFixedSpp) pPass->mFixedSpp = value;
+            else if (key == k2SppThreshold) pPass->mThreshold2spp = value;
+            else if (key == k3SppThreshold) pPass->mThreshold3spp = value;
             else logWarning("Unknown field '{}' in PathTracerWithSVGF dictionary.", key);
         }
     }
@@ -90,7 +96,6 @@ void PathTracerWithSVGF::compile(RenderContext* pRenderContext, const CompileDat
     Fbo::Desc desc;
     desc.setSampleCount(0);
     mpFbo = Fbo::create2D(dim.x, dim.y, desc);
-    mIsFirstFrame = true;
 
     mpRenderGraph = RenderGraph::create("PathTracerWithSVGF Pass");
     mpRenderGraph->addPass(mpPathTracerPass, "PathTracer");
@@ -107,6 +112,9 @@ Dictionary PathTracerWithSVGF::getScriptingDictionary()
     auto svgfPassDict = mpSVGFPass->getScriptingDictionary();
     Dictionary dict;
     dict[kUseAdaptiveSampling] = mUseAdaptiveSampling;
+    dict[k2SppThreshold] = mThreshold2spp;
+    dict[k3SppThreshold] = mThreshold3spp;
+    dict[kFixedSpp] = mFixedSpp;
     return dict;
 }
 
@@ -125,7 +133,7 @@ RenderPassReflection PathTracerWithSVGF::reflect(const CompileData& compileData)
     reflector.addInput(kInputBufferLinearZ, "LinearZ");
     reflector.addInput(kInputBufferMotionVector, "Motion vectors");
     reflector.addOutput(kOutputColor, "color").format(ResourceFormat::RGBA32Float);
-    reflector.addInternal(kInternalBufferPreviousVariance, "Previous Variance")
+    reflector.addOutput(kInternalBufferPreviousVariance, "Previous Variance")
         .format(ResourceFormat::R16Float)
         .bindFlags(Resource::BindFlags::ShaderResource);
     reflector.addInternal(kInternalBufferSampleCount, "Sample Count")
@@ -160,17 +168,15 @@ void PathTracerWithSVGF::execute(RenderContext* pRenderContext, const RenderData
     mpFbo->attachColorTarget(pSampleCount, 0); //set sampleCount as render target
     FALCOR_ASSERT(mpFbo->getWidth() == pSampleCount->getWidth() && mpFbo->getHeight() == pSampleCount->getHeight());
     FALCOR_ASSERT(mpFbo->getWidth() == pPreviousVariance->getWidth() && mpFbo->getHeight() == pPreviousVariance->getHeight());
-    if (mUseAdaptiveSampling) {
-        auto perImageCB = mpSampleCountPass["PerImageCB"];
-        perImageCB["gPrevVariance"] = pPreviousVariance;
-        perImageCB["gMotion"] = pMotionVector;
-        perImageCB["gIsFirstFrame"] = mIsFirstFrame;
-        mpSampleCountPass->execute(pRenderContext, mpFbo);
-        mIsFirstFrame = false;
-    }
-    else {
-        pRenderContext->clearTexture(pSampleCount.get(),uint4(1,0,0,0));
-    }
+    auto perImageCB = mpSampleCountPass["PerImageCB"];
+    perImageCB["gPrevVariance"] = pPreviousVariance;
+    perImageCB["gMotion"] = pMotionVector;
+    perImageCB["gThreshold2spp"] = mThreshold2spp;
+    perImageCB["gThreshold3spp"] = mThreshold3spp;
+    perImageCB["gUseAdaptiveSampling"] = mUseAdaptiveSampling;
+    perImageCB["gFixedSpp"] = mFixedSpp;
+    mpSampleCountPass->execute(pRenderContext, mpFbo);
+    
 
     mpRenderGraph->setInput("PathTracer.vbuffer", pVBuffer);
     mpRenderGraph->setInput("PathTracer.sampleCount", pSampleCount);
@@ -192,7 +198,19 @@ void PathTracerWithSVGF::execute(RenderContext* pRenderContext, const RenderData
 
 void PathTracerWithSVGF::renderUI(Gui::Widgets& widget)
 {
-    widget.checkbox("Enable Adaptive Sampling", mUseAdaptiveSampling);
+    
     mpPathTracerPass->renderUI(widget);
     mpSVGFPass->renderUI(widget);
+    widget.checkbox("Enable Adaptive Sampling", mUseAdaptiveSampling);
+    if (mUseAdaptiveSampling) {
+        widget.text("Contol Adaptive Sampling Threshold");
+        widget.var("2spp threshold", mThreshold2spp, 0.0f, 0.1f, 0.01f);
+        widget.var("3spp threshold", mThreshold3spp, 0.1f, 1.0f, 0.01f);
+    }
+    else {
+        widget.var("Fixed spp", mFixedSpp, uint32_t(1), uint32_t(5));
+    }
+    
+    
+    
 }

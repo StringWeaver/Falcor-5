@@ -32,8 +32,6 @@ import SVGFCommon;
 
 cbuffer PerImageCB
 {
-    Texture2D   gDiffuseReflectance;
-    Texture2D   gSpecularReflectance;
     Texture2D   gHistoryLength;
     Texture2D   gIllumination;
     Texture2D   gLinearZAndNormal;
@@ -71,7 +69,7 @@ float computeVarianceCenter(int2 ipos)
 float4 main(FullScreenPassVsOut vsOut) : SV_TARGET0
 {
     const int2 ipos       = int2(vsOut.posH.xy);
-    const int2 screenSize = getTextureDims(gDiffuseReflectance, 0);
+    const int2 screenSize = getTextureDims(gHistoryLength, 0);
 
     const float epsVariance      = 1e-10;
     const float kernelWeights[3] = { 1.0, 2.0 / 3.0, 1.0 / 6.0 };
