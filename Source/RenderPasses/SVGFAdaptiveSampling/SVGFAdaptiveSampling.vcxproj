@@ -11,11 +11,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{CC4DBD39-1C96-43F3-AFD9-EA3053FFE22A}</ProjectGuid>
+    <ProjectGuid>{2C9F6A54-8197-4A86-96AF-B3EDE8611F36}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>PathTracerWithSVGF</RootNamespace>
+    <RootNamespace>SVGFAdaptiveSampling</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.19041.0</WindowsTargetPlatformVersion>
-    <ProjectName>PathTracerWithSVGF</ProjectName>
+    <ProjectName>SVGFAdaptiveSampling</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -25,20 +25,14 @@
     <Import Project="..\..\Falcor\Falcor.props" />
   </ImportGroup>
   <ItemGroup>
-    <ClCompile Include="PathTracerWithSVGF.cpp" />
+    <ClCompile Include="SVGFAdaptiveSampling.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="PathTracerWithSVGF.h" />
+    <ClInclude Include="SVGFAdaptiveSampling.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Falcor\Falcor.vcxproj">
       <Project>{2c535635-e4c5-4098-a928-574f0e7cd5f9}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\PathTracer\PathTracer.vcxproj">
-      <Project>{99799ba5-6503-425c-bfcc-8b94e6a40d1d}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\SVGFPass\SVGFPass.vcxproj">
-      <Project>{691f64dd-0941-49de-b52e-949341192154}</Project>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

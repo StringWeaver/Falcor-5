@@ -169,7 +169,7 @@ RenderPassReflection SVGFPass::reflect(const CompileData& compileData)
         .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
 
     reflector.addOutput(kOutputBufferFilteredImage, "Filtered image").format(ResourceFormat::RGBA32Float);
-    reflector.addOutput(kOutputBufferVariance, "Variance").format(ResourceFormat::R16Float);
+    reflector.addInputOutput(kOutputBufferVariance, "Variance").format(ResourceFormat::R16Float);
     reflector.addOutput(kOutputBufferHistoryLength, "History length").format(ResourceFormat::R16Float);
 
     return reflector;

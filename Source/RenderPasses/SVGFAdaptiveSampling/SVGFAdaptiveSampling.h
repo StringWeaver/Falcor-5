@@ -32,10 +32,10 @@
 
 using namespace Falcor;
 
-class PathTracerWithSVGF : public RenderPass
+class SVGFAdaptiveSampling : public RenderPass
 {
 public:
-    using SharedPtr = std::shared_ptr<PathTracerWithSVGF>;
+    using SharedPtr = std::shared_ptr<SVGFAdaptiveSampling>;
 
     static const Info kInfo;
 
@@ -56,10 +56,7 @@ public:
     virtual bool onKeyEvent(const KeyboardEvent& keyEvent) override { return false; }
 
 private:
-    PathTracerWithSVGF() : RenderPass(kInfo) {}
-    RenderGraph::SharedPtr mpRenderGraph;
-    PathTracer::SharedPtr mpPathTracerPass;
-    SVGFPass::SharedPtr mpSVGFPass;
+    SVGFAdaptiveSampling() : RenderPass(kInfo) {}
     FullScreenPass::SharedPtr mpSampleCountPass;
     Scene::SharedPtr mpScene;
     Fbo::SharedPtr mpFbo;
