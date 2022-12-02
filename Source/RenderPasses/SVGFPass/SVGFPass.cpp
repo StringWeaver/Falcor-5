@@ -274,11 +274,12 @@ void SVGFPass::execute(RenderContext* pRenderContext, const RenderData& renderDa
         perImageCB["gSpecularReflectance"] = pSpecularReflectanceTexture;
         perImageCB["gEmission"] = pEmissionTexture;
         perImageCB["gIllumination"] = mpPingPongFbo[0]->getColorTexture(0);
+        perImageCB["gMoments"] = mpCurReprojFbo->getColorTexture(1);
+        mpFinalFbo->attachColorTarget(pOutputColorTexture, 0);
+        mpFinalFbo->attachColorTarget(pOutputVarianceTexture, 1);
         mpFinalModulate->execute(pRenderContext, mpFinalFbo);
 
         // Blit into the output texture.
-        pRenderContext->blit(mpFinalFbo->getColorTexture(0)->getSRV(), pOutputColorTexture->getRTV());
-        pRenderContext->blit(mpFinalFbo->getColorTexture(1)->getSRV(), pOutputVarianceTexture->getRTV());
         pRenderContext->blit(mpCurReprojFbo->getColorTexture(2)->getSRV(), pOutputHistoryLengthTexture->getRTV());
 
         // Swap resources so we're ready for next frame.

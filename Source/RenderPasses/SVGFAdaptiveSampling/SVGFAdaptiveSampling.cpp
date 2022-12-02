@@ -153,8 +153,5 @@ void SVGFAdaptiveSampling::renderUI(Gui::Widgets& widget)
     }
     else {
         widget.var("Fixed spp", mFixedSpp, uint32_t(1), uint32_t(5));
-    }
-    
-    
-    
+    }  
 }

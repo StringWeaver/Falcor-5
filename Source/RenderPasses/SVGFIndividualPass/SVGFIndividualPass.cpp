@@ -51,6 +51,7 @@ namespace
     const char kIterations[] = "Iterations";
     const char kFeedbackTap[] = "FeedbackTap";
     const char kVarianceEpsilon[] = "VarianceEpsilon";
+    const char kCoefficientOfVariationEpsilon[] = "CoefficientOfVariationEpsilon";
     const char kPhiColor[] = "PhiColor";
     const char kPhiNormal[] = "PhiNormal";
     const char kAlpha[] = "Alpha";
@@ -74,8 +75,7 @@ namespace
 
     // Output buffer name
     const char kOutputBufferFilteredImage[] = "Filtered image";
-    const char kOutputBufferVariance[] = "Variance";
-    const char kOutputBufferHistoryLength[] = "History length";
+    const char kOutputBufferCoefficientOfVariation[] = "Coefficient of Variation";
 }
 
 // Don't remove this. it's required for hot-reload to function properly
@@ -103,6 +103,7 @@ SVGFIndividualPass::SVGFIndividualPass(const Dictionary& dict)
         else if (key == kIterations) mFilterIterations = value;
         else if (key == kFeedbackTap) mFeedbackTap = value;
         else if (key == kVarianceEpsilon) mVarainceEpsilon = value;
+        else if (key == kCoefficientOfVariationEpsilon) mMomentEpsilon = value;
         else if (key == kPhiColor) mPhiColor = value;
         else if (key == kPhiNormal) mPhiNormal = value;
         else if (key == kAlpha) mAlpha = value;
@@ -125,6 +126,7 @@ Dictionary SVGFIndividualPass::getScriptingDictionary()
     dict[kIterations] = mFilterIterations;
     dict[kFeedbackTap] = mFeedbackTap;
     dict[kVarianceEpsilon] = mVarainceEpsilon;
+    dict[kCoefficientOfVariationEpsilon] = mMomentEpsilon;
     dict[kPhiColor] = mPhiColor;
     dict[kPhiNormal] = mPhiNormal;
     dict[kAlpha] = mAlpha;
@@ -169,8 +171,7 @@ RenderPassReflection SVGFIndividualPass::reflect(const CompileData& compileData)
         .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
 
     reflector.addOutput(kOutputBufferFilteredImage, "Filtered image").format(ResourceFormat::RGBA32Float);
-    reflector.addInputOutput(kOutputBufferVariance, "Variance").format(ResourceFormat::R16Float);
-    reflector.addOutput(kOutputBufferHistoryLength, "History length").format(ResourceFormat::R16Float);
+    reflector.addOutput(kOutputBufferCoefficientOfVariation, "Coefficient of Variation").format(ResourceFormat::R16Float);
 
     return reflector;
 }
@@ -201,10 +202,9 @@ void SVGFIndividualPass::compile(RenderContext* pRenderContext, const CompileDat
         // Screen-size FBOs with 1 RGBA32F buffer
         Fbo::Desc desc;
         desc.setColorTarget(0, Falcor::ResourceFormat::RGBA32Float); //color
-        desc.setColorTarget(1, Falcor::ResourceFormat::R16Float);  //variance
+        desc.setColorTarget(1, Falcor::ResourceFormat::R16Float);  //Coefficient of Variation
         mpPingPongFbo[0] = Fbo::create2D(dim.x, dim.y, desc);
         mpPingPongFbo[1] = Fbo::create2D(dim.x, dim.y, desc);
-        mpFilteredPastFbo = Fbo::create2D(dim.x, dim.y, desc);
         mpFilteredIlluminationFbo = Fbo::create2D(dim.x, dim.y, desc);
         mpFinalFbo = Fbo::create2D(dim.x, dim.y, desc);
     }
@@ -223,10 +223,10 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
     Texture::SharedPtr pPosNormalFwidthTexture = renderData[kInputBufferPosNormalFwidth]->asTexture();
     Texture::SharedPtr pLinearZTexture = renderData[kInputBufferLinearZ]->asTexture();
     Texture::SharedPtr pMotionVectorTexture = renderData[kInputBufferMotionVector]->asTexture();
+    Texture::SharedPtr pPrevIllumTexture = renderData[kInternalBufferPreviousLighting]->asTexture();
 
     Texture::SharedPtr pOutputColorTexture = renderData[kOutputBufferFilteredImage]->asTexture();
-    Texture::SharedPtr pOutputVarianceTexture = renderData[kOutputBufferVariance]->asTexture();
-    Texture::SharedPtr pOutputHistoryLengthTexture = renderData[kOutputBufferHistoryLength]->asTexture();
+    Texture::SharedPtr pOutputCoefficientOfVariationTexture = renderData[kOutputBufferCoefficientOfVariation]->asTexture();
 
     FALCOR_ASSERT(mpFilteredIlluminationFbo &&
            mpFilteredIlluminationFbo->getWidth() == pDiffuseReflectanceTexture->getWidth() &&
@@ -255,7 +255,7 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
         computeReprojection(pRenderContext, pDiffuseReflectanceTexture,
                             pSpecularReflectanceTexture, pColorTexture, pEmissionTexture,
                             pMotionVectorTexture, pPosNormalFwidthTexture,
-                            pPrevLinearZAndNormalTexture);
+                            pPrevLinearZAndNormalTexture, pPrevIllumTexture);
 
         // Do a first cross-bilateral filtering of the illumination and
         // estimate its variance, storing the result into a float4 in
@@ -266,7 +266,7 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
         // in mpPingPongFbo[0].  Along the way (or at the end, depending on
         // the value of mFeedbackTap), save the filtered illumination for
         // next time into mpFilteredPastFbo.
-        computeAtrousDecomposition(pRenderContext, pDiffuseReflectanceTexture, pSpecularReflectanceTexture);
+        computeAtrousDecomposition(pRenderContext, pDiffuseReflectanceTexture, pSpecularReflectanceTexture, pPrevIllumTexture);
 
         // Compute albedo * filtered illumination and add emission back in.
         auto perImageCB = mpFinalModulate["PerImageCB"];
@@ -274,12 +274,11 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
         perImageCB["gSpecularReflectance"] = pSpecularReflectanceTexture;
         perImageCB["gEmission"] = pEmissionTexture;
         perImageCB["gIllumination"] = mpPingPongFbo[0]->getColorTexture(0);
+        perImageCB["gMoments"] = mpCurReprojFbo->getColorTexture(1);
+        mpFinalFbo->attachColorTarget(pOutputColorTexture, 0);
+        mpFinalFbo->attachColorTarget(pOutputCoefficientOfVariationTexture, 1);
         mpFinalModulate->execute(pRenderContext, mpFinalFbo);
 
-        // Blit into the output texture.
-        pRenderContext->blit(mpFinalFbo->getColorTexture(0)->getSRV(), pOutputColorTexture->getRTV());
-        pRenderContext->blit(mpFinalFbo->getColorTexture(1)->getSRV(), pOutputVarianceTexture->getRTV());
-        pRenderContext->blit(mpCurReprojFbo->getColorTexture(2)->getSRV(), pOutputHistoryLengthTexture->getRTV());
 
         // Swap resources so we're ready for next frame.
         std::swap(mpCurReprojFbo, mpPrevReprojFbo);
@@ -299,7 +298,6 @@ void SVGFIndividualPass::clearBuffers(RenderContext* pRenderContext, const Rende
     pRenderContext->clearFbo(mpPingPongFbo[0].get(), float4(0), 1.0f, 0, FboAttachmentType::All);
     pRenderContext->clearFbo(mpPingPongFbo[1].get(), float4(0), 1.0f, 0, FboAttachmentType::All);
     pRenderContext->clearFbo(mpLinearZAndNormalFbo.get(), float4(0), 1.0f, 0, FboAttachmentType::All);
-    pRenderContext->clearFbo(mpFilteredPastFbo.get(), float4(0), 1.0f, 0, FboAttachmentType::All);
     pRenderContext->clearFbo(mpCurReprojFbo.get(), float4(0), 1.0f, 0, FboAttachmentType::All);
     pRenderContext->clearFbo(mpPrevReprojFbo.get(), float4(0), 1.0f, 0, FboAttachmentType::All);
     pRenderContext->clearFbo(mpFilteredIlluminationFbo.get(), float4(0), 1.0f, 0, FboAttachmentType::All);
@@ -307,6 +305,7 @@ void SVGFIndividualPass::clearBuffers(RenderContext* pRenderContext, const Rende
     pRenderContext->clearTexture(renderData[kInternalBufferPreviousLinearZAndNormal]->asTexture().get());
     pRenderContext->clearTexture(renderData[kInternalBufferPreviousLighting]->asTexture().get());
     pRenderContext->clearTexture(renderData[kInternalBufferPreviousMoments]->asTexture().get());
+    pRenderContext->clearTexture(renderData[kOutputBufferCoefficientOfVariation]->asTexture().get());
 }
 
 // Extracts linear z and its derivative from the linear Z texture and packs
@@ -328,7 +327,7 @@ void SVGFIndividualPass::computeReprojection(RenderContext* pRenderContext, Text
                                    Texture::SharedPtr pColorTexture, Texture::SharedPtr pEmissionTexture,
                                    Texture::SharedPtr pMotionVectorTexture,
                                    Texture::SharedPtr pPositionNormalFwidthTexture,
-                                   Texture::SharedPtr pPrevLinearZTexture)
+                                   Texture::SharedPtr pPrevLinearZTexture, Texture::SharedPtr pPrevIllumTexture)
 {
     auto perImageCB = mpReprojection["PerImageCB"];
 
@@ -339,7 +338,7 @@ void SVGFIndividualPass::computeReprojection(RenderContext* pRenderContext, Text
     perImageCB["gDiffuseReflectance"] = pDiffuseReflectanceTexture;
     perImageCB["gSpecularReflectance"] = pSpecularReflectanceTexture;
     perImageCB["gPositionNormalFwidth"] = pPositionNormalFwidthTexture;
-    perImageCB["gPrevIllum"]     = mpFilteredPastFbo->getColorTexture(0);
+    perImageCB["gPrevIllum"]     = pPrevIllumTexture;
     perImageCB["gPrevMoments"]   = mpPrevReprojFbo->getColorTexture(1);
     perImageCB["gLinearZAndNormal"]       = mpLinearZAndNormalFbo->getColorTexture(0);
     perImageCB["gPrevLinearZAndNormal"]   = pPrevLinearZTexture;
@@ -357,9 +356,9 @@ void SVGFIndividualPass::computeFilteredMoments(RenderContext* pRenderContext)
     auto perImageCB = mpFilterMoments["PerImageCB"];
 
     perImageCB["gIllumination"]     = mpCurReprojFbo->getColorTexture(0);
+    perImageCB["gMoments"] = mpCurReprojFbo->getColorTexture(1);
     perImageCB["gHistoryLength"]    = mpCurReprojFbo->getColorTexture(2);
     perImageCB["gLinearZAndNormal"]          = mpLinearZAndNormalFbo->getColorTexture(0);
-    perImageCB["gMoments"]          = mpCurReprojFbo->getColorTexture(1);
 
     perImageCB["gPhiColor"]  = mPhiColor;
     perImageCB["gPhiNormal"]  = mPhiNormal;
@@ -367,7 +366,7 @@ void SVGFIndividualPass::computeFilteredMoments(RenderContext* pRenderContext)
     mpFilterMoments->execute(pRenderContext, mpPingPongFbo[0]);
 }
 
-void SVGFIndividualPass::computeAtrousDecomposition(RenderContext* pRenderContext, Texture::SharedPtr pDiffuseReflectanceTexture, Texture::SharedPtr pSpecularReflectanceTexture)
+void SVGFIndividualPass::computeAtrousDecomposition(RenderContext* pRenderContext, Texture::SharedPtr pDiffuseReflectanceTexture, Texture::SharedPtr pSpecularReflectanceTexture, Texture::SharedPtr pPrevIllumTexture)
 {
     auto perImageCB = mpAtrous["PerImageCB"];
     perImageCB["gHistoryLength"] = mpCurReprojFbo->getColorTexture(2);
@@ -375,28 +374,31 @@ void SVGFIndividualPass::computeAtrousDecomposition(RenderContext* pRenderContex
 
     perImageCB["gPhiColor"]  = mPhiColor;
     perImageCB["gPhiNormal"] = mPhiNormal;
+    perImageCB["epsVariance"] = mVarainceEpsilon;
+    perImageCB["epsMoment"] = mMomentEpsilon;
 
+    bool isPrevIllumCopied = false;
     for (int i = 0; i < mFilterIterations; i++)
     {
-        Fbo::SharedPtr curTargetFbo = mpPingPongFbo[1];
 
         perImageCB["gIllumination"] = mpPingPongFbo[0]->getColorTexture(0);
         perImageCB["gStepSize"] = 1 << i;
 
-        mpAtrous->execute(pRenderContext, curTargetFbo);
+        mpAtrous->execute(pRenderContext, mpPingPongFbo[1]);
 
         // store the filtered color for the feedback path
         if (i == std::min(mFeedbackTap, mFilterIterations - 1))
         {
-            pRenderContext->blit(curTargetFbo->getColorTexture(0)->getSRV(), mpFilteredPastFbo->getRenderTargetView(0));
+            pRenderContext->blit(mpPingPongFbo[1]->getColorTexture(0)->getSRV(), pPrevIllumTexture->getRTV());
+            isPrevIllumCopied = true;
         }
 
         std::swap(mpPingPongFbo[0], mpPingPongFbo[1]);
     }
 
-    if (mFeedbackTap < 0)
+    if (!isPrevIllumCopied)
     {
-        pRenderContext->blit(mpCurReprojFbo->getColorTexture(0)->getSRV(), mpFilteredPastFbo->getRenderTargetView(0));
+        pRenderContext->blit(mpCurReprojFbo->getColorTexture(0)->getSRV(), pPrevIllumTexture->getRTV());
     }
 }
 
@@ -408,7 +410,7 @@ void SVGFIndividualPass::renderUI(Gui::Widgets& widget)
     widget.text("");
     widget.text("Number of filter iterations.  Which");
     widget.text("    iteration feeds into future frames?");
-    dirty |= (int)widget.var("Iterations", mFilterIterations, 2, 10, 1);
+    dirty |= (int)widget.var("Iterations", mFilterIterations, 0, 10, 1);
     dirty |= (int)widget.var("Feedback", mFeedbackTap, -1, mFilterIterations - 2, 1);
 
     widget.text("");
@@ -416,11 +418,17 @@ void SVGFIndividualPass::renderUI(Gui::Widgets& widget)
     dirty |= (int)widget.var("For Color", mPhiColor, 0.0f, 10000.0f, 0.01f);
     dirty |= (int)widget.var("For Normal", mPhiNormal, 0.001f, 1000.0f, 0.2f);
 
+    widget.text("Control epsilons");
+    dirty |= (int)widget.var("Eps Variance", mVarainceEpsilon, 1e-10f, 1.0f, 0.000000001f);
+    dirty |= (int)widget.var("Eps Moment(for compute Coefficient of Variation)", mMomentEpsilon, 1e-10f, 1.0f, 0.000000001f);
+    
     widget.text("");
     widget.text("How much history should be used?");
     widget.text("    (alpha; 0 = full reuse; 1 = no reuse)");
     dirty |= (int)widget.var("Alpha", mAlpha, 0.0f, 1.0f, 0.001f);
     dirty |= (int)widget.var("Moments Alpha", mMomentsAlpha, 0.0f, 1.0f, 0.001f);
+
+    
 
     if (dirty) mBuffersNeedClear = true;
 }

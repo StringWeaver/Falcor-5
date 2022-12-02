@@ -34,6 +34,7 @@ cbuffer PerImageCB
     Texture2D   gSpecularReflectance;
     Texture2D   gEmission;
     Texture2D   gIllumination;
+    Texture2D   gMoments;
 };
 struct PS_OUT{
     float3 outColor: SV_TARGET0;

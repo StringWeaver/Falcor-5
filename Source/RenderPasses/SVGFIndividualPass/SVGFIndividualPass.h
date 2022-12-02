@@ -56,9 +56,9 @@ private:
                              Texture::SharedPtr pColorTexture, Texture::SharedPtr pEmissionTexture,
                              Texture::SharedPtr pMotionVectorTexture,
                              Texture::SharedPtr pPositionNormalFwidthTexture,
-                             Texture::SharedPtr pPrevLinearZAndNormalTexture);
+                             Texture::SharedPtr pPrevLinearZAndNormalTexture, Texture::SharedPtr pPrevIllumTexture);
     void computeFilteredMoments(RenderContext* pRenderContext);
-    void computeAtrousDecomposition(RenderContext* pRenderContext, Texture::SharedPtr pDiffuseReflectanceTexture, Texture::SharedPtr pSpecularReflectanceTexture);
+    void computeAtrousDecomposition(RenderContext* pRenderContext, Texture::SharedPtr pDiffuseReflectanceTexture, Texture::SharedPtr pSpecularReflectanceTexture, Texture::SharedPtr pPrevIllumTexture);
 
     bool mBuffersNeedClear = false;
 
@@ -66,7 +66,8 @@ private:
     bool    mFilterEnabled       = true;
     int32_t mFilterIterations    = 4;
     int32_t mFeedbackTap         = 1;
-    float   mVarainceEpsilon     = 1e-4f;
+    float   mVarainceEpsilon     = 1e-8f;
+    float   mMomentEpsilon     = 1e-3f;
     float   mPhiColor            = 10.0f;
     float   mPhiNormal           = 128.0f;
     float   mAlpha               = 0.05f;
@@ -82,7 +83,6 @@ private:
     // Intermediate framebuffers
     Fbo::SharedPtr mpPingPongFbo[2];
     Fbo::SharedPtr mpLinearZAndNormalFbo;
-    Fbo::SharedPtr mpFilteredPastFbo;
     Fbo::SharedPtr mpCurReprojFbo;
     Fbo::SharedPtr mpPrevReprojFbo;
     Fbo::SharedPtr mpFilteredIlluminationFbo;
