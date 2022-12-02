@@ -71,7 +71,7 @@ private:
     FullScreenPass::SharedPtr mpFinalModulate;
 
     // Intermediate framebuffers
-    Fbo::SharedPtr mpPingPongFbo[2];
+    Fbo::SharedPtr mpAtrousFbo;
     Fbo::SharedPtr mpLinearZAndNormalFbo;
     Fbo::SharedPtr mpCurReprojFbo;
     Fbo::SharedPtr mpPrevReprojFbo;
