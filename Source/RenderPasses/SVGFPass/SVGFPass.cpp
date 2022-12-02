@@ -57,8 +57,7 @@ namespace
     const char kMomentsAlpha[] = "MomentsAlpha";
 
     // Input buffer names
-    const char kInputBufferDiffuseReflectance[] = "DiffuseReflectance";
-    const char kInputBufferSpecularReflectance[] = "SpecularReflectance";
+    const char kInputBufferAlbedo[] = "Albedo";
     const char kInputBufferColor[] = "Color";
     const char kInputBufferEmission[] = "Emission";
     const char kInputBufferWorldPosition[] = "WorldPosition";
@@ -74,8 +73,6 @@ namespace
 
     // Output buffer name
     const char kOutputBufferFilteredImage[] = "Filtered image";
-    const char kOutputBufferVariance[] = "Variance";
-    const char kOutputBufferHistoryLength[] = "History length";
 }
 
 // Don't remove this. it's required for hot-reload to function properly
@@ -148,8 +145,7 @@ RenderPassReflection SVGFPass::reflect(const CompileData& compileData)
 {
     RenderPassReflection reflector;
 
-    reflector.addInput(kInputBufferDiffuseReflectance, "DiffuseReflectance");
-    reflector.addInput(kInputBufferSpecularReflectance, "SpecularReflectance");
+    reflector.addInput(kInputBufferAlbedo, "Albedo");
     reflector.addInput(kInputBufferColor, "Color");
     reflector.addInput(kInputBufferEmission, "Emission");
     reflector.addInput(kInputBufferWorldPosition, "World Position");
@@ -160,62 +156,31 @@ RenderPassReflection SVGFPass::reflect(const CompileData& compileData)
 
     reflector.addInternal(kInternalBufferPreviousLinearZAndNormal, "Previous Linear Z and Packed Normal")
         .format(ResourceFormat::RGBA32Float)
-        .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
+        .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource)
+        ;
     reflector.addInternal(kInternalBufferPreviousLighting, "Previous Filtered Lighting")
         .format(ResourceFormat::RGBA32Float)
-        .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
+        .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource)
+        ;
     reflector.addInternal(kInternalBufferPreviousMoments, "Previous Moments")
         .format(ResourceFormat::RG32Float)
-        .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
+        .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource)
+        ;
 
-    reflector.addOutput(kOutputBufferFilteredImage, "Filtered image").format(ResourceFormat::RGBA32Float);
-    reflector.addOutput(kOutputBufferVariance, "Variance").format(ResourceFormat::R16Float);
-    reflector.addOutput(kOutputBufferHistoryLength, "History length").format(ResourceFormat::R16Float);
+    reflector.addOutput(kOutputBufferFilteredImage, "Filtered image").format(ResourceFormat::RGBA16Float);
 
     return reflector;
 }
 
 void SVGFPass::compile(RenderContext* pRenderContext, const CompileData& compileData)
 {
-    uint2 dim = compileData.defaultTexDims;
-    {
-        // Screen-size FBOs with 3 MRTs: one that is RGBA32F, one that is
-        // RG32F for the luminance moments, and one that is R16F.
-        Fbo::Desc desc;
-        desc.setSampleCount(0);
-        desc.setColorTarget(0, Falcor::ResourceFormat::RGBA32Float); // illumination
-        desc.setColorTarget(1, Falcor::ResourceFormat::RG32Float);   // moments
-        desc.setColorTarget(2, Falcor::ResourceFormat::R16Float);    // history length
-        mpCurReprojFbo = Fbo::create2D(dim.x, dim.y, desc);
-        mpPrevReprojFbo = Fbo::create2D(dim.x, dim.y, desc);
-    }
-
-    {
-        // Screen-size RGBA32F buffer for linear Z, derivative, and packed normal
-        Fbo::Desc desc;
-        desc.setColorTarget(0, Falcor::ResourceFormat::RGBA32Float);
-        mpLinearZAndNormalFbo = Fbo::create2D(dim.x, dim.y, desc);
-    }
-
-    {
-        // Screen-size FBOs with 1 RGBA32F buffer
-        Fbo::Desc desc;
-        desc.setColorTarget(0, Falcor::ResourceFormat::RGBA32Float); //color
-        desc.setColorTarget(1, Falcor::ResourceFormat::R16Float);  //variance
-        mpPingPongFbo[0] = Fbo::create2D(dim.x, dim.y, desc);
-        mpPingPongFbo[1] = Fbo::create2D(dim.x, dim.y, desc);
-        mpFilteredPastFbo = Fbo::create2D(dim.x, dim.y, desc);
-        mpFilteredIlluminationFbo = Fbo::create2D(dim.x, dim.y, desc);
-        mpFinalFbo = Fbo::create2D(dim.x, dim.y, desc);
-    }
-
+    allocateFbos(compileData.defaultTexDims, pRenderContext);
     mBuffersNeedClear = true;
 }
 
 void SVGFPass::execute(RenderContext* pRenderContext, const RenderData& renderData)
 {
-    Texture::SharedPtr pDiffuseReflectanceTexture = renderData[kInputBufferDiffuseReflectance]->asTexture();
-    Texture::SharedPtr pSpecularReflectanceTexture = renderData[kInputBufferSpecularReflectance]->asTexture();
+    Texture::SharedPtr pAlbedoTexture = renderData[kInputBufferAlbedo]->asTexture();
     Texture::SharedPtr pColorTexture = renderData[kInputBufferColor]->asTexture();
     Texture::SharedPtr pEmissionTexture = renderData[kInputBufferEmission]->asTexture();
     Texture::SharedPtr pWorldPositionTexture = renderData[kInputBufferWorldPosition]->asTexture();
@@ -224,15 +189,11 @@ void SVGFPass::execute(RenderContext* pRenderContext, const RenderData& renderDa
     Texture::SharedPtr pLinearZTexture = renderData[kInputBufferLinearZ]->asTexture();
     Texture::SharedPtr pMotionVectorTexture = renderData[kInputBufferMotionVector]->asTexture();
 
-    Texture::SharedPtr pOutputColorTexture = renderData[kOutputBufferFilteredImage]->asTexture();
-    Texture::SharedPtr pOutputVarianceTexture = renderData[kOutputBufferVariance]->asTexture();
-    Texture::SharedPtr pOutputHistoryLengthTexture = renderData[kOutputBufferHistoryLength]->asTexture();
+    Texture::SharedPtr pOutputTexture = renderData[kOutputBufferFilteredImage]->asTexture();
 
     FALCOR_ASSERT(mpFilteredIlluminationFbo &&
-           mpFilteredIlluminationFbo->getWidth() == pDiffuseReflectanceTexture->getWidth() &&
-           mpFilteredIlluminationFbo->getHeight() == pDiffuseReflectanceTexture->getHeight() &&
-            mpFilteredIlluminationFbo->getWidth() == pSpecularReflectanceTexture->getWidth() &&
-            mpFilteredIlluminationFbo->getHeight() == pSpecularReflectanceTexture->getHeight());
+           mpFilteredIlluminationFbo->getWidth() == pAlbedoTexture->getWidth() &&
+           mpFilteredIlluminationFbo->getHeight() == pAlbedoTexture->getHeight());
 
     if (mBuffersNeedClear)
     {
@@ -252,8 +213,7 @@ void SVGFPass::execute(RenderContext* pRenderContext, const RenderData& renderDa
         // per-pixel history length in mpCurReprojFbo.
         Texture::SharedPtr pPrevLinearZAndNormalTexture =
             renderData[kInternalBufferPreviousLinearZAndNormal]->asTexture();
-        computeReprojection(pRenderContext, pDiffuseReflectanceTexture,
-                            pSpecularReflectanceTexture, pColorTexture, pEmissionTexture,
+        computeReprojection(pRenderContext, pAlbedoTexture, pColorTexture, pEmissionTexture,
                             pMotionVectorTexture, pPosNormalFwidthTexture,
                             pPrevLinearZAndNormalTexture);
 
@@ -266,21 +226,17 @@ void SVGFPass::execute(RenderContext* pRenderContext, const RenderData& renderDa
         // in mpPingPongFbo[0].  Along the way (or at the end, depending on
         // the value of mFeedbackTap), save the filtered illumination for
         // next time into mpFilteredPastFbo.
-        computeAtrousDecomposition(pRenderContext, pDiffuseReflectanceTexture, pSpecularReflectanceTexture);
+        computeAtrousDecomposition(pRenderContext, pAlbedoTexture);
 
         // Compute albedo * filtered illumination and add emission back in.
         auto perImageCB = mpFinalModulate["PerImageCB"];
-        perImageCB["gDiffuseReflectance"] = pDiffuseReflectanceTexture;
-        perImageCB["gSpecularReflectance"] = pSpecularReflectanceTexture;
+        perImageCB["gAlbedo"] = pAlbedoTexture;
         perImageCB["gEmission"] = pEmissionTexture;
         perImageCB["gIllumination"] = mpPingPongFbo[0]->getColorTexture(0);
-        perImageCB["gMoments"] = mpCurReprojFbo->getColorTexture(1);
-        mpFinalFbo->attachColorTarget(pOutputColorTexture, 0);
-        mpFinalFbo->attachColorTarget(pOutputVarianceTexture, 1);
         mpFinalModulate->execute(pRenderContext, mpFinalFbo);
 
         // Blit into the output texture.
-        pRenderContext->blit(mpCurReprojFbo->getColorTexture(2)->getSRV(), pOutputHistoryLengthTexture->getRTV());
+        pRenderContext->blit(mpFinalFbo->getColorTexture(0)->getSRV(), pOutputTexture->getRTV());
 
         // Swap resources so we're ready for next frame.
         std::swap(mpCurReprojFbo, mpPrevReprojFbo);
@@ -289,11 +245,44 @@ void SVGFPass::execute(RenderContext* pRenderContext, const RenderData& renderDa
     }
     else
     {
-        pRenderContext->blit(pColorTexture->getSRV(), pOutputColorTexture->getRTV());
+        pRenderContext->blit(pColorTexture->getSRV(), pOutputTexture->getRTV());
     }
 }
 
+void SVGFPass::allocateFbos(uint2 dim, RenderContext* pRenderContext)
+{
+    {
+        // Screen-size FBOs with 3 MRTs: one that is RGBA32F, one that is
+        // RG32F for the luminance moments, and one that is R16F.
+        Fbo::Desc desc;
+        desc.setSampleCount(0);
+        desc.setColorTarget(0, Falcor::ResourceFormat::RGBA32Float); // illumination
+        desc.setColorTarget(1, Falcor::ResourceFormat::RG32Float);   // moments
+        desc.setColorTarget(2, Falcor::ResourceFormat::R16Float);    // history length
+        mpCurReprojFbo  = Fbo::create2D(dim.x, dim.y, desc);
+        mpPrevReprojFbo = Fbo::create2D(dim.x, dim.y, desc);
+    }
 
+    {
+        // Screen-size RGBA32F buffer for linear Z, derivative, and packed normal
+        Fbo::Desc desc;
+        desc.setColorTarget(0, Falcor::ResourceFormat::RGBA32Float);
+        mpLinearZAndNormalFbo = Fbo::create2D(dim.x, dim.y, desc);
+    }
+
+    {
+        // Screen-size FBOs with 1 RGBA32F buffer
+        Fbo::Desc desc;
+        desc.setColorTarget(0, Falcor::ResourceFormat::RGBA32Float);
+        mpPingPongFbo[0]  = Fbo::create2D(dim.x, dim.y, desc);
+        mpPingPongFbo[1]  = Fbo::create2D(dim.x, dim.y, desc);
+        mpFilteredPastFbo = Fbo::create2D(dim.x, dim.y, desc);
+        mpFilteredIlluminationFbo       = Fbo::create2D(dim.x, dim.y, desc);
+        mpFinalFbo        = Fbo::create2D(dim.x, dim.y, desc);
+    }
+
+    mBuffersNeedClear = true;
+}
 
 void SVGFPass::clearBuffers(RenderContext* pRenderContext, const RenderData& renderData)
 {
@@ -325,7 +314,7 @@ void SVGFPass::computeLinearZAndNormal(RenderContext* pRenderContext, Texture::S
     mpPackLinearZAndNormal->execute(pRenderContext, mpLinearZAndNormalFbo);
 }
 
-void SVGFPass::computeReprojection(RenderContext* pRenderContext, Texture::SharedPtr pDiffuseReflectanceTexture, Texture::SharedPtr pSpecularReflectanceTexture,
+void SVGFPass::computeReprojection(RenderContext* pRenderContext, Texture::SharedPtr pAlbedoTexture,
                                    Texture::SharedPtr pColorTexture, Texture::SharedPtr pEmissionTexture,
                                    Texture::SharedPtr pMotionVectorTexture,
                                    Texture::SharedPtr pPositionNormalFwidthTexture,
@@ -337,8 +326,7 @@ void SVGFPass::computeReprojection(RenderContext* pRenderContext, Texture::Share
     perImageCB["gMotion"]        = pMotionVectorTexture;
     perImageCB["gColor"]         = pColorTexture;
     perImageCB["gEmission"]      = pEmissionTexture;
-    perImageCB["gDiffuseReflectance"] = pDiffuseReflectanceTexture;
-    perImageCB["gSpecularReflectance"] = pSpecularReflectanceTexture;
+    perImageCB["gAlbedo"]        = pAlbedoTexture;
     perImageCB["gPositionNormalFwidth"] = pPositionNormalFwidthTexture;
     perImageCB["gPrevIllum"]     = mpFilteredPastFbo->getColorTexture(0);
     perImageCB["gPrevMoments"]   = mpPrevReprojFbo->getColorTexture(1);
@@ -368,9 +356,11 @@ void SVGFPass::computeFilteredMoments(RenderContext* pRenderContext)
     mpFilterMoments->execute(pRenderContext, mpPingPongFbo[0]);
 }
 
-void SVGFPass::computeAtrousDecomposition(RenderContext* pRenderContext, Texture::SharedPtr pDiffuseReflectanceTexture, Texture::SharedPtr pSpecularReflectanceTexture)
+void SVGFPass::computeAtrousDecomposition(RenderContext* pRenderContext, Texture::SharedPtr pAlbedoTexture)
 {
     auto perImageCB = mpAtrous["PerImageCB"];
+
+    perImageCB["gAlbedo"]        = pAlbedoTexture;
     perImageCB["gHistoryLength"] = mpCurReprojFbo->getColorTexture(2);
     perImageCB["gLinearZAndNormal"]       = mpLinearZAndNormalFbo->getColorTexture(0);
 
