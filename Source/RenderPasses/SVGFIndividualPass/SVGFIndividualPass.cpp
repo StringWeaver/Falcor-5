@@ -244,7 +244,13 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
     {
         // Grab linear z and its derivative and also pack the normal into
         // the last two channels of the mpLinearZAndNormalFbo.
-        computeLinearZAndNormal(pRenderContext, pLinearZTexture, pWorldNormalTexture);
+        {
+            auto perImageCB = mpPackLinearZAndNormal["PerImageCB"];
+            perImageCB["gLinearZ"] = pLinearZTexture;
+            perImageCB["gNormal"] = pWorldNormalTexture;
+
+            mpPackLinearZAndNormal->execute(pRenderContext, mpLinearZAndNormalFbo);
+        }
 
         // Demodulate input color & albedo to get illumination and lerp in
         // reprojected filtered illumination from the previous frame.
@@ -252,21 +258,83 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
         // per-pixel history length in mpCurReprojFbo.
         Texture::SharedPtr pPrevLinearZAndNormalTexture =
             renderData[kInternalBufferPreviousLinearZAndNormal]->asTexture();
-        computeReprojection(pRenderContext, pDiffuseReflectanceTexture,
-                            pSpecularReflectanceTexture, pColorTexture, pEmissionTexture,
-                            pMotionVectorTexture, pPosNormalFwidthTexture,
-                            pPrevLinearZAndNormalTexture, pPrevIllumTexture);
+        {
+            auto perImageCB = mpReprojection["PerImageCB"];
 
+            // Setup textures for our reprojection shader pass
+            perImageCB["gMotion"] = pMotionVectorTexture;
+            perImageCB["gColor"] = pColorTexture;
+            perImageCB["gEmission"] = pEmissionTexture;
+            perImageCB["gDiffuseReflectance"] = pDiffuseReflectanceTexture;
+            perImageCB["gSpecularReflectance"] = pSpecularReflectanceTexture;
+            perImageCB["gPositionNormalFwidth"] = pPosNormalFwidthTexture;
+            perImageCB["gPrevIllum"] = pPrevIllumTexture;
+            perImageCB["gPrevMoments"] = mpPrevReprojFbo->getColorTexture(1);
+            perImageCB["gLinearZAndNormal"] = mpLinearZAndNormalFbo->getColorTexture(0);
+            perImageCB["gPrevLinearZAndNormal"] = pPrevLinearZAndNormalTexture;
+            perImageCB["gPrevHistoryLength"] = mpPrevReprojFbo->getColorTexture(2);
+
+            // Setup variables for our reprojection pass
+            perImageCB["gAlpha"] = mAlpha;
+            perImageCB["gMomentsAlpha"] = mMomentsAlpha;
+
+            mpReprojection->execute(pRenderContext, mpCurReprojFbo);
+        }
         // Do a first cross-bilateral filtering of the illumination and
         // estimate its variance, storing the result into a float4 in
         // mpPingPongFbo[0].  Takes mpCurReprojFbo as input.
-        computeFilteredMoments(pRenderContext);
+        {
+            auto perImageCB = mpFilterMoments["PerImageCB"];
+
+            perImageCB["gIllumination"] = mpCurReprojFbo->getColorTexture(0);
+            perImageCB["gMoments"] = mpCurReprojFbo->getColorTexture(1);
+            perImageCB["gHistoryLength"] = mpCurReprojFbo->getColorTexture(2);
+            perImageCB["gLinearZAndNormal"] = mpLinearZAndNormalFbo->getColorTexture(0);
+
+            perImageCB["gPhiColor"] = mPhiColor;
+            perImageCB["gPhiNormal"] = mPhiNormal;
+
+            mpFilterMoments->execute(pRenderContext, mpPingPongFbo[0]);
+        }
 
         // Filter illumination from mpCurReprojFbo[0], storing the result
         // in mpPingPongFbo[0].  Along the way (or at the end, depending on
         // the value of mFeedbackTap), save the filtered illumination for
         // next time into mpFilteredPastFbo.
-        computeAtrousDecomposition(pRenderContext, pDiffuseReflectanceTexture, pSpecularReflectanceTexture, pPrevIllumTexture);
+        {
+            auto perImageCB = mpAtrous["PerImageCB"];
+            perImageCB["gHistoryLength"] = mpCurReprojFbo->getColorTexture(2);
+            perImageCB["gLinearZAndNormal"] = mpLinearZAndNormalFbo->getColorTexture(0);
+
+            perImageCB["gPhiColor"] = mPhiColor;
+            perImageCB["gPhiNormal"] = mPhiNormal;
+            perImageCB["epsVariance"] = mVarainceEpsilon;
+            perImageCB["epsMoment"] = mMomentEpsilon;
+
+            bool isPrevIllumCopied = false;
+            for (int i = 0; i < mFilterIterations; i++)
+            {
+
+                perImageCB["gIllumination"] = mpPingPongFbo[0]->getColorTexture(0);
+                perImageCB["gStepSize"] = 1 << i;
+
+                mpAtrous->execute(pRenderContext, mpPingPongFbo[1]);
+
+                // store the filtered color for the feedback path
+                if (i == std::min(mFeedbackTap, mFilterIterations - 1))
+                {
+                    pRenderContext->blit(mpPingPongFbo[1]->getColorTexture(0)->getSRV(), pPrevIllumTexture->getRTV());
+                    isPrevIllumCopied = true;
+                }
+
+                std::swap(mpPingPongFbo[0], mpPingPongFbo[1]);
+            }
+
+            if (!isPrevIllumCopied)
+            {
+                pRenderContext->blit(mpCurReprojFbo->getColorTexture(0)->getSRV(), pPrevIllumTexture->getRTV());
+            }
+        }
 
         // Compute albedo * filtered illumination and add emission back in.
         auto perImageCB = mpFinalModulate["PerImageCB"];
@@ -313,94 +381,7 @@ void SVGFIndividualPass::clearBuffers(RenderContext* pRenderContext, const Rende
 // (It's slightly wasteful to copy linear z here, but having this all
 // together in a single buffer is a small simplification, since we make a
 // copy of it to refer to in the next frame.)
-void SVGFIndividualPass::computeLinearZAndNormal(RenderContext* pRenderContext, Texture::SharedPtr pLinearZTexture,
-                                       Texture::SharedPtr pWorldNormalTexture)
-{
-    auto perImageCB = mpPackLinearZAndNormal["PerImageCB"];
-    perImageCB["gLinearZ"] = pLinearZTexture;
-    perImageCB["gNormal"] = pWorldNormalTexture;
 
-    mpPackLinearZAndNormal->execute(pRenderContext, mpLinearZAndNormalFbo);
-}
-
-void SVGFIndividualPass::computeReprojection(RenderContext* pRenderContext, Texture::SharedPtr pDiffuseReflectanceTexture, Texture::SharedPtr pSpecularReflectanceTexture,
-                                   Texture::SharedPtr pColorTexture, Texture::SharedPtr pEmissionTexture,
-                                   Texture::SharedPtr pMotionVectorTexture,
-                                   Texture::SharedPtr pPositionNormalFwidthTexture,
-                                   Texture::SharedPtr pPrevLinearZTexture, Texture::SharedPtr pPrevIllumTexture)
-{
-    auto perImageCB = mpReprojection["PerImageCB"];
-
-    // Setup textures for our reprojection shader pass
-    perImageCB["gMotion"]        = pMotionVectorTexture;
-    perImageCB["gColor"]         = pColorTexture;
-    perImageCB["gEmission"]      = pEmissionTexture;
-    perImageCB["gDiffuseReflectance"] = pDiffuseReflectanceTexture;
-    perImageCB["gSpecularReflectance"] = pSpecularReflectanceTexture;
-    perImageCB["gPositionNormalFwidth"] = pPositionNormalFwidthTexture;
-    perImageCB["gPrevIllum"]     = pPrevIllumTexture;
-    perImageCB["gPrevMoments"]   = mpPrevReprojFbo->getColorTexture(1);
-    perImageCB["gLinearZAndNormal"]       = mpLinearZAndNormalFbo->getColorTexture(0);
-    perImageCB["gPrevLinearZAndNormal"]   = pPrevLinearZTexture;
-    perImageCB["gPrevHistoryLength"] = mpPrevReprojFbo->getColorTexture(2);
-
-    // Setup variables for our reprojection pass
-    perImageCB["gAlpha"] = mAlpha;
-    perImageCB["gMomentsAlpha"] = mMomentsAlpha;
-
-    mpReprojection->execute(pRenderContext, mpCurReprojFbo);
-}
-
-void SVGFIndividualPass::computeFilteredMoments(RenderContext* pRenderContext)
-{
-    auto perImageCB = mpFilterMoments["PerImageCB"];
-
-    perImageCB["gIllumination"]     = mpCurReprojFbo->getColorTexture(0);
-    perImageCB["gMoments"] = mpCurReprojFbo->getColorTexture(1);
-    perImageCB["gHistoryLength"]    = mpCurReprojFbo->getColorTexture(2);
-    perImageCB["gLinearZAndNormal"]          = mpLinearZAndNormalFbo->getColorTexture(0);
-
-    perImageCB["gPhiColor"]  = mPhiColor;
-    perImageCB["gPhiNormal"]  = mPhiNormal;
-
-    mpFilterMoments->execute(pRenderContext, mpPingPongFbo[0]);
-}
-
-void SVGFIndividualPass::computeAtrousDecomposition(RenderContext* pRenderContext, Texture::SharedPtr pDiffuseReflectanceTexture, Texture::SharedPtr pSpecularReflectanceTexture, Texture::SharedPtr pPrevIllumTexture)
-{
-    auto perImageCB = mpAtrous["PerImageCB"];
-    perImageCB["gHistoryLength"] = mpCurReprojFbo->getColorTexture(2);
-    perImageCB["gLinearZAndNormal"]       = mpLinearZAndNormalFbo->getColorTexture(0);
-
-    perImageCB["gPhiColor"]  = mPhiColor;
-    perImageCB["gPhiNormal"] = mPhiNormal;
-    perImageCB["epsVariance"] = mVarainceEpsilon;
-    perImageCB["epsMoment"] = mMomentEpsilon;
-
-    bool isPrevIllumCopied = false;
-    for (int i = 0; i < mFilterIterations; i++)
-    {
-
-        perImageCB["gIllumination"] = mpPingPongFbo[0]->getColorTexture(0);
-        perImageCB["gStepSize"] = 1 << i;
-
-        mpAtrous->execute(pRenderContext, mpPingPongFbo[1]);
-
-        // store the filtered color for the feedback path
-        if (i == std::min(mFeedbackTap, mFilterIterations - 1))
-        {
-            pRenderContext->blit(mpPingPongFbo[1]->getColorTexture(0)->getSRV(), pPrevIllumTexture->getRTV());
-            isPrevIllumCopied = true;
-        }
-
-        std::swap(mpPingPongFbo[0], mpPingPongFbo[1]);
-    }
-
-    if (!isPrevIllumCopied)
-    {
-        pRenderContext->blit(mpCurReprojFbo->getColorTexture(0)->getSRV(), pPrevIllumTexture->getRTV());
-    }
-}
 
 void SVGFIndividualPass::renderUI(Gui::Widgets& widget)
 {

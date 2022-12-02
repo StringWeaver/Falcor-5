@@ -50,16 +50,6 @@ private:
     bool init(const Dictionary& dict);
     void clearBuffers(RenderContext* pRenderContext, const RenderData& renderData);
 
-    void computeLinearZAndNormal(RenderContext* pRenderContext, Texture::SharedPtr pLinearZTexture,
-                                 Texture::SharedPtr pWorldNormalTexture);
-    void computeReprojection(RenderContext* pRenderContext, Texture::SharedPtr pDiffuseReflectanceTexture, Texture::SharedPtr pSpecularReflectanceTexture,
-                             Texture::SharedPtr pColorTexture, Texture::SharedPtr pEmissionTexture,
-                             Texture::SharedPtr pMotionVectorTexture,
-                             Texture::SharedPtr pPositionNormalFwidthTexture,
-                             Texture::SharedPtr pPrevLinearZAndNormalTexture, Texture::SharedPtr pPrevIllumTexture);
-    void computeFilteredMoments(RenderContext* pRenderContext);
-    void computeAtrousDecomposition(RenderContext* pRenderContext, Texture::SharedPtr pDiffuseReflectanceTexture, Texture::SharedPtr pSpecularReflectanceTexture, Texture::SharedPtr pPrevIllumTexture);
-
     bool mBuffersNeedClear = false;
 
     // SVGF parameters
