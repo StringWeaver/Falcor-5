@@ -78,6 +78,8 @@ namespace
     // Output buffer name
     const char kOutputBufferFilteredImage[] = "Filtered image";
     const char kOutputBufferCoefficientOfVariation[] = "Coefficient of Variation";
+    const char  kOutputBufferDebugView1[] = "Debug View 1";
+    const char  kOutputBufferDebugView2[] = "Debug View 2";
 }
 
 // Don't remove this. it's required for hot-reload to function properly
@@ -178,8 +180,10 @@ RenderPassReflection SVGFIndividualPass::reflect(const CompileData& compileData)
         .format(ResourceFormat::RGBA32Float)
         .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
 
-    reflector.addOutput(kOutputBufferFilteredImage, "Filtered image").format(ResourceFormat::RGB32Float);
-    reflector.addOutput(kOutputBufferCoefficientOfVariation, "Coefficient of Variation").format(ResourceFormat::R16Float);
+    reflector.addOutput(kOutputBufferFilteredImage, "Filtered image").format(ResourceFormat::RGBA32Float);
+    reflector.addOutput(kOutputBufferCoefficientOfVariation, "Coefficient of Variation").format(ResourceFormat::R16Float).bindFlags(Resource::BindFlags::RenderTarget);
+    reflector.addOutput(kOutputBufferDebugView1, kOutputBufferDebugView1).format(ResourceFormat::R16Float).bindFlags(Resource::BindFlags::RenderTarget);
+    reflector.addOutput(kOutputBufferDebugView2, kOutputBufferDebugView2).format(ResourceFormat::R16Float).bindFlags(Resource::BindFlags::RenderTarget);
 
     return reflector;
 }
@@ -235,6 +239,8 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
 
     Texture::SharedPtr pOutputColorTexture = renderData[kOutputBufferFilteredImage]->asTexture();
     Texture::SharedPtr pOutputCoefficientOfVariationTexture = renderData[kOutputBufferCoefficientOfVariation]->asTexture();
+    Texture::SharedPtr pOutputDebugView1Texture = renderData[kOutputBufferDebugView1]->asTexture();
+    Texture::SharedPtr pOutputDebugView2Texture = renderData[kOutputBufferDebugView2]->asTexture();
 
 
     if (mBuffersNeedClear)
@@ -348,8 +354,12 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
         perImageCB["gEmission"] = pEmissionTexture;
         perImageCB["gIllumination"] = pPrevIterAtrousResultTexture;
         perImageCB["gMoments"] = mpCurReprojFbo->getColorTexture(1);
+        perImageCB["gHistoryLength"] = mpCurReprojFbo->getColorTexture(2);
+        perImageCB["gAlpha"] = mAlpha;
         mpFinalFbo->attachColorTarget(pOutputColorTexture, 0);
         mpFinalFbo->attachColorTarget(pOutputCoefficientOfVariationTexture, 1);
+        mpFinalFbo->attachColorTarget(pOutputDebugView1Texture, 2);
+        mpFinalFbo->attachColorTarget(pOutputDebugView2Texture, 3);
         mpFinalModulate->execute(pRenderContext, mpFinalFbo);
 
 

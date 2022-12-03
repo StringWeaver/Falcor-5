@@ -35,17 +35,27 @@ cbuffer PerImageCB
     Texture2D   gEmission;
     Texture2D   gIllumination;
     Texture2D   gMoments;
+    Texture2D   gHistoryLength;
+    float gAlpha;
     
 };
 struct PS_OUT{
     float3 outColor: SV_TARGET0;
     float outCoefficientOfVariation : SV_TARGET1;
+    float outDbgView1 : SV_TARGET2;
+    float outDbgView2 : SV_TARGET3;
+}
+inline float luminance(float3 rgb)
+{
+    return dot(rgb, float3(0.2126f, 0.7152f, 0.0722f));
 }
 PS_OUT main(FullScreenPassVsOut vsOut) 
 {
     PS_OUT psOut;
     const int2 ipos = int2(vsOut.posH.xy);
     psOut.outColor = (gDiffuseReflectance[ipos].rgb + gSpecularReflectance[ipos].rgb) * gIllumination[ipos].rgb + gEmission[ipos].rgb;
-    psOut.outCoefficientOfVariation = gIllumination[ipos].a;
+    psOut.outCoefficientOfVariation = 50.f * gIllumination[ipos].a / luminance(gIllumination[ipos].rgb);
+    psOut.outDbgView1 = gHistoryLength[ipos].r * gAlpha;
+    psOut.outDbgView2 = gMoments[ipos].r;
     return psOut;
 }
