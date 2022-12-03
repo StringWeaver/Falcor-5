@@ -73,6 +73,9 @@ namespace
 
     // Output buffer name
     const char kOutputBufferFilteredImage[] = "Filtered image";
+    const char kOutputBufferCoefficientOfVariation[] = "Coefficient of Variation";
+    const char  kOutputBufferDebugView1[] = "Debug View 1";
+    const char  kOutputBufferDebugView2[] = "Debug View 2";
 }
 
 // Don't remove this. it's required for hot-reload to function properly
@@ -168,7 +171,9 @@ RenderPassReflection SVGFPass::reflect(const CompileData& compileData)
         ;
 
     reflector.addOutput(kOutputBufferFilteredImage, "Filtered image").format(ResourceFormat::RGBA16Float);
-
+    reflector.addOutput(kOutputBufferCoefficientOfVariation, "Coefficient of Variation").format(ResourceFormat::R16Float);
+    reflector.addOutput(kOutputBufferDebugView1, kOutputBufferDebugView1).format(ResourceFormat::R16Float);
+    reflector.addOutput(kOutputBufferDebugView2, kOutputBufferDebugView2).format(ResourceFormat::R16Float);
     return reflector;
 }
 
@@ -190,6 +195,9 @@ void SVGFPass::execute(RenderContext* pRenderContext, const RenderData& renderDa
     Texture::SharedPtr pMotionVectorTexture = renderData[kInputBufferMotionVector]->asTexture();
 
     Texture::SharedPtr pOutputTexture = renderData[kOutputBufferFilteredImage]->asTexture();
+    Texture::SharedPtr pOutputCoefficientOfVariationTexture = renderData[kOutputBufferCoefficientOfVariation]->asTexture();
+    Texture::SharedPtr pOutputDebugView1Texture = renderData[kOutputBufferDebugView1]->asTexture();
+    Texture::SharedPtr pOutputDebugView2Texture = renderData[kOutputBufferDebugView2]->asTexture();
 
     FALCOR_ASSERT(mpFilteredIlluminationFbo &&
            mpFilteredIlluminationFbo->getWidth() == pAlbedoTexture->getWidth() &&
@@ -233,11 +241,15 @@ void SVGFPass::execute(RenderContext* pRenderContext, const RenderData& renderDa
         perImageCB["gAlbedo"] = pAlbedoTexture;
         perImageCB["gEmission"] = pEmissionTexture;
         perImageCB["gIllumination"] = mpPingPongFbo[0]->getColorTexture(0);
+        perImageCB["gMoments"] = mpCurReprojFbo->getColorTexture(1);
+        perImageCB["gHistoryLength"] = mpCurReprojFbo->getColorTexture(2);
+        perImageCB["gAlpha"] = mAlpha;
         mpFinalFbo->attachColorTarget(pOutputTexture, 0);
+        mpFinalFbo->attachColorTarget(pOutputCoefficientOfVariationTexture, 1);
+        mpFinalFbo->attachColorTarget(pOutputDebugView1Texture, 2);
+        mpFinalFbo->attachColorTarget(pOutputDebugView2Texture, 3);
         mpFinalModulate->execute(pRenderContext, mpFinalFbo);
 
-        // Blit into the output texture.
-        pRenderContext->blit(mpFinalFbo->getColorTexture(0)->getSRV(), pOutputTexture->getRTV());
 
         // Swap resources so we're ready for next frame.
         std::swap(mpCurReprojFbo, mpPrevReprojFbo);
@@ -280,7 +292,6 @@ void SVGFPass::allocateFbos(uint2 dim, RenderContext* pRenderContext)
         mpPingPongFbo[1]  = Fbo::create2D(dim.x, dim.y, desc);
         mpFilteredPastFbo = Fbo::create2D(dim.x, dim.y, desc);
         mpFilteredIlluminationFbo       = Fbo::create2D(dim.x, dim.y, desc);
-        mpFinalFbo        = Fbo::create2D(dim.x, dim.y, desc);
     }
 
     mBuffersNeedClear = true;

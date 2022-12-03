@@ -33,11 +33,28 @@ cbuffer PerImageCB
     Texture2D   gAlbedo;
     Texture2D   gEmission;
     Texture2D   gIllumination;
+    Texture2D   gMoments;
+    Texture2D   gHistoryLength;
+    float       gAlpha;
 };
-
-float4 main(FullScreenPassVsOut vsOut) : SV_TARGET0
+struct PS_OUT{
+    float4 outColor: SV_TARGET0;
+    float outCoefficientOfVariation : SV_TARGET1;
+    float outDbgView1 : SV_TARGET2;
+    float outDbgView2 : SV_TARGET3;
+}
+inline float luminance(float3 rgb)
 {
-    const int2 ipos = int2(vsOut.posH.xy);
+    return dot(rgb, float3(0.2126f, 0.7152f, 0.0722f));
+}
 
-    return gAlbedo[ipos] * gIllumination[ipos] + gEmission[ipos];
+PS_OUT main(FullScreenPassVsOut vsOut) : SV_TARGET0
+{
+    PS_OUT psOut;
+    const int2 ipos = int2(vsOut.posH.xy);
+    psOut.outColor = gAlbedo[ipos] * gIllumination[ipos] + gEmission[ipos];
+    psOut.outCoefficientOfVariation = 50.f * gIllumination[ipos].a / luminance(gIllumination[ipos].rgb);
+    psOut.outDbgView1 = gHistoryLength[ipos].r * gAlpha;
+    psOut.outDbgView2 = gMoments[ipos].r;
+    return psOut;
 }
