@@ -113,7 +113,7 @@ bool loadPrevData(float2 posH, out float4 prevIllum, out float2 prevMoments, out
         if (isReprjValid(tapIpos, depth.x, depthPrev.x, depth.y, normal, normalPrev, normalFwidth)) {
             prevIllum += tapWeight * gPrevIllum[tapIpos];
             prevMoments += tapWeight * gPrevMoments[tapIpos].xy;
-            historyLength += gPrevHistoryLength[tapIpos].x;
+            historyLength += tapWeight * gPrevHistoryLength[tapIpos].x;
             sumw += tapWeight;
         };
     }
@@ -121,41 +121,6 @@ bool loadPrevData(float2 posH, out float4 prevIllum, out float2 prevMoments, out
     prevIllum = valid ? prevIllum / sumw : float4(0, 0, 0, 0);
     prevMoments = valid ? prevMoments / sumw : float2(0, 0);
     historyLength = valid ? historyLength / sumw : 0.0;
-
-
-    if (!valid) // perform cross-bilateral filter in the hope to find some suitable samples somewhere
-    {
-        float nValid = 0.0;
-
-        // this code performs a binary descision for each tap of the cross-bilateral filter
-        const int radius = 1;
-        for (int yy = -radius; yy <= radius; yy++)
-        {
-            for (int xx = -radius; xx <= radius; xx++)
-            {
-                const int2 p = iposPrev + int2(xx, yy);
-                const float2 depthFilter = gPrevLinearZAndNormal[p].xy;
-                const float3 normalFilter = oct_to_ndir_snorm(gPrevLinearZAndNormal[p].zw);
-
-                if (isReprjValid(iposPrev, depth.x, depthFilter.x, depth.y, normal, normalFilter, normalFwidth))
-                {
-                    prevIllum += gPrevIllum[p];
-                    prevMoments += gPrevMoments[p].xy;
-                    historyLength += gPrevHistoryLength[p].x;
-                    nValid += 1.0;
-                }
-            }
-        }
-        if (nValid > 0)
-        {
-            valid = true;
-            prevIllum   /= nValid;
-            prevMoments /= nValid;
-            historyLength /= nValid;
-        }
-    }
-
-
     return valid;
 }
 
