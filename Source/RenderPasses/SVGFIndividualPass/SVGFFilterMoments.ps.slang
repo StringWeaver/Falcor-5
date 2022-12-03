@@ -46,10 +46,10 @@ float4 main(FullScreenPassVsOut vsOut) : SV_TARGET0
     float4 posH = vsOut.posH;
     int2 ipos = int2(posH.xy);
 
-    float h = gHistoryLength[ipos].x;
+    float historyLength = gHistoryLength[ipos].x;
     int2 screenSize = getTextureDims(gHistoryLength, 0);
 
-    if (h < 4.0) // not enough temporal history available
+    if (historyLength < 4.0) // not enough temporal history available
     {
         float sumWIllumination   = 0.0;
         float3 sumIllumination   = float3(0.0, 0.0, 0.0);
@@ -111,7 +111,7 @@ float4 main(FullScreenPassVsOut vsOut) : SV_TARGET0
         float variance = sumMoments.g - sumMoments.r * sumMoments.r;
 
         // give the variance a boost for the first frames
-        variance *= 4.0 / h;
+        // variance *= 4.0 / historyLength;
 
         return float4(sumIllumination, variance);
     }

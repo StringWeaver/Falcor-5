@@ -196,7 +196,6 @@ void SVGFIndividualPass::compile(RenderContext* pRenderContext, const CompileDat
         // RG32F for the luminance moments, and one that is R16F.
         Fbo::Desc desc;
         desc.setSampleCount(0);
-        desc.setColorTarget(0, Falcor::ResourceFormat::RGBA32Float); // illumination
         desc.setColorTarget(1, Falcor::ResourceFormat::RG32Float);   // moments
         desc.setColorTarget(2, Falcor::ResourceFormat::R16Float);    // history length
         mpCurReprojFbo = Fbo::create2D(dim.x, dim.y, desc);
@@ -233,9 +232,9 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
     Texture::SharedPtr pPosNormalFwidthTexture = renderData[kInputBufferPosNormalFwidth]->asTexture();
     Texture::SharedPtr pLinearZTexture = renderData[kInputBufferLinearZ]->asTexture();
     Texture::SharedPtr pMotionVectorTexture = renderData[kInputBufferMotionVector]->asTexture();
-    Texture::SharedPtr pPrevIllumTexture = renderData[kInternalBufferPreviousLighting]->asTexture();
-    Texture::SharedPtr pPrevIterAtrousResultTexture = renderData[kInternalBufferAtrousResult0]->asTexture();
-    Texture::SharedPtr pCurrIterAtrousResultTexture = renderData[kInternalBufferAtrousResult1]->asTexture();
+    Texture::SharedPtr pPrevFrameIllumTexture = renderData[kInternalBufferPreviousLighting]->asTexture();
+    Texture::SharedPtr pPrevIterIllumTexture = renderData[kInternalBufferAtrousResult0]->asTexture();
+    Texture::SharedPtr pCurrIterIllumTexture = renderData[kInternalBufferAtrousResult1]->asTexture();
 
     Texture::SharedPtr pOutputColorTexture = renderData[kOutputBufferFilteredImage]->asTexture();
     Texture::SharedPtr pOutputCoefficientOfVariationTexture = renderData[kOutputBufferCoefficientOfVariation]->asTexture();
@@ -277,25 +276,27 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
             perImageCB["gDiffuseReflectance"] = pDiffuseReflectanceTexture;
             perImageCB["gSpecularReflectance"] = pSpecularReflectanceTexture;
             perImageCB["gPositionNormalFwidth"] = pPosNormalFwidthTexture;
-            perImageCB["gPrevIllum"] = pPrevIllumTexture;
+            perImageCB["gPrevIllum"] = pPrevFrameIllumTexture;
             perImageCB["gPrevMoments"] = mpPrevReprojFbo->getColorTexture(1);
+            perImageCB["gPrevHistoryLength"] = mpPrevReprojFbo->getColorTexture(2);
             perImageCB["gLinearZAndNormal"] = mpLinearZAndNormalFbo->getColorTexture(0);
             perImageCB["gPrevLinearZAndNormal"] = pPrevLinearZAndNormalTexture;
-            perImageCB["gPrevHistoryLength"] = mpPrevReprojFbo->getColorTexture(2);
 
             // Setup variables for our reprojection pass
             perImageCB["gAlpha"] = mAlpha;
             perImageCB["gMomentsAlpha"] = mMomentsAlpha;
 
+            mpAtrousFbo->attachColorTarget(pCurrIterIllumTexture, 0);
             mpReprojection->execute(pRenderContext, mpCurReprojFbo);
+            std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
         }
         // Do a first cross-bilateral filtering of the illumination and
         // estimate its variance, storing the result into a float4 in
-        // pCurrIterAtrousResultTexture.  Takes mpCurReprojFbo as input.
+        // pCurrIterIllumTexture.  Takes mpCurReprojFbo as input.
         {
             auto perImageCB = mpFilterMoments["PerImageCB"];
 
-            perImageCB["gIllumination"] = mpCurReprojFbo->getColorTexture(0);
+            perImageCB["gIllumination"] = pPrevFrameIllumTexture;
             perImageCB["gMoments"] = mpCurReprojFbo->getColorTexture(1);
             perImageCB["gHistoryLength"] = mpCurReprojFbo->getColorTexture(2);
             perImageCB["gLinearZAndNormal"] = mpLinearZAndNormalFbo->getColorTexture(0);
@@ -303,12 +304,13 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
             perImageCB["gPhiColor"] = mPhiColor;
             perImageCB["gPhiNormal"] = mPhiNormal;
 
-            mpAtrousFbo->attachColorTarget(pPrevIterAtrousResultTexture, 0);
+            mpCurReprojFbo->attachColorTarget(pCurrIterIllumTexture, 0);
             mpFilterMoments->execute(pRenderContext, mpAtrousFbo);
+            std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
         }
 
-        // Filter illumination from pPrevIterAtrousResultTexture, storing the result
-        // in pCurrIterAtrousResultTexture.  Along the way (or at the end, depending on
+        // Filter illumination from pPrevIterIllumTexture, storing the result
+        // in pCurrIterIllumTexture.  Along the way (or at the end, depending on
         // the value of mFeedbackTap), save the filtered illumination for
         // next time into mpFilteredPastFbo.
         {
@@ -325,25 +327,25 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
             for (int i = 0; i < mFilterIterations; i++)
             {
 
-                perImageCB["gIllumination"] = pPrevIterAtrousResultTexture;
+                perImageCB["gIllumination"] = pPrevIterIllumTexture;
                 perImageCB["gStepSize"] = 1 << i;
-                mpAtrousFbo->attachColorTarget(pCurrIterAtrousResultTexture, 0);
+                mpAtrousFbo->attachColorTarget(pCurrIterIllumTexture, 0);
 
                 mpAtrous->execute(pRenderContext, mpAtrousFbo);
 
                 // store the filtered color for the feedback path
                 if (i == std::min(mFeedbackTap, mFilterIterations - 1))
                 {
-                    pRenderContext->blit(pCurrIterAtrousResultTexture->getSRV(), pPrevIllumTexture->getRTV());
+                    pRenderContext->blit(pCurrIterIllumTexture->getSRV(), pPrevFrameIllumTexture->getRTV());
                     isPrevIllumCopied = true;
                 }
 
-                std::swap(pCurrIterAtrousResultTexture, pPrevIterAtrousResultTexture);
+                std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
             }
 
             if (!isPrevIllumCopied)
             {
-                pRenderContext->blit(mpCurReprojFbo->getColorTexture(0)->getSRV(), pPrevIllumTexture->getRTV());
+                pRenderContext->blit(mpCurReprojFbo->getColorTexture(0)->getSRV(), pPrevFrameIllumTexture->getRTV());
             }
         }
 
@@ -352,7 +354,7 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
         perImageCB["gDiffuseReflectance"] = pDiffuseReflectanceTexture;
         perImageCB["gSpecularReflectance"] = pSpecularReflectanceTexture;
         perImageCB["gEmission"] = pEmissionTexture;
-        perImageCB["gIllumination"] = pPrevIterAtrousResultTexture;
+        perImageCB["gIllumination"] = pPrevIterIllumTexture;
         perImageCB["gMoments"] = mpCurReprojFbo->getColorTexture(1);
         perImageCB["gHistoryLength"] = mpCurReprojFbo->getColorTexture(2);
         perImageCB["gAlpha"] = mAlpha;

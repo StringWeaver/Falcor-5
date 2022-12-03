@@ -103,8 +103,7 @@ bool loadPrevData(float2 posH, out float4 prevIllum, out float2 prevMoments, out
     float sumw = 0;
     for (int tapIdx = 0; tapIdx < 4; tapIdx++)
     {
-        float2 tapPos = posPrev + offset[tapIdx];
-        int2 tapIpos = tapPos;
+        int2 tapIpos = int2(posPrev + offset[tapIdx]);
         float2 tapCenter = tapIpos + float2(0.5, 0.5);
         float tapWeight = (1.0 - abs(posPrev.x - tapCenter.x)) * (1.0 - abs(posPrev.y - tapCenter.y));
         float2 depthPrev = gPrevLinearZAndNormal[tapIpos].xy;
@@ -167,8 +166,6 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     float2 moments;
     moments.r = luminance(illumination);
     moments.g = moments.r * moments.r;
-
-    float2 pm = moments;
 
     // temporal integration of the moments
     moments = lerp(prevMoments, moments, alphaMoments);
