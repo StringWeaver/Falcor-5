@@ -233,6 +233,7 @@ void SVGFPass::execute(RenderContext* pRenderContext, const RenderData& renderDa
         perImageCB["gAlbedo"] = pAlbedoTexture;
         perImageCB["gEmission"] = pEmissionTexture;
         perImageCB["gIllumination"] = mpPingPongFbo[0]->getColorTexture(0);
+        mpFinalFbo->attachColorTarget(pOutputTexture, 0);
         mpFinalModulate->execute(pRenderContext, mpFinalFbo);
 
         // Blit into the output texture.
@@ -273,6 +274,7 @@ void SVGFPass::allocateFbos(uint2 dim, RenderContext* pRenderContext)
     {
         // Screen-size FBOs with 1 RGBA32F buffer
         Fbo::Desc desc;
+        mpFinalFbo = Fbo::create2D(dim.x, dim.y, desc);
         desc.setColorTarget(0, Falcor::ResourceFormat::RGBA32Float);
         mpPingPongFbo[0]  = Fbo::create2D(dim.x, dim.y, desc);
         mpPingPongFbo[1]  = Fbo::create2D(dim.x, dim.y, desc);
@@ -399,7 +401,7 @@ void SVGFPass::renderUI(Gui::Widgets& widget)
     widget.text("");
     widget.text("Number of filter iterations.  Which");
     widget.text("    iteration feeds into future frames?");
-    dirty |= (int)widget.var("Iterations", mFilterIterations, 2, 10, 1);
+    dirty |= (int)widget.var("Iterations", mFilterIterations, 0, 10, 1);
     dirty |= (int)widget.var("Feedback", mFeedbackTap, -1, mFilterIterations - 2, 1);
 
     widget.text("");

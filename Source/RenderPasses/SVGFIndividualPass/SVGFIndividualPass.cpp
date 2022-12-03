@@ -178,7 +178,7 @@ RenderPassReflection SVGFIndividualPass::reflect(const CompileData& compileData)
         .format(ResourceFormat::RGBA32Float)
         .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
 
-    reflector.addOutput(kOutputBufferFilteredImage, "Filtered image").format(ResourceFormat::RGBA32Float);
+    reflector.addOutput(kOutputBufferFilteredImage, "Filtered image").format(ResourceFormat::RGB32Float);
     reflector.addOutput(kOutputBufferCoefficientOfVariation, "Coefficient of Variation").format(ResourceFormat::R16Float);
 
     return reflector;
