@@ -286,7 +286,7 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
             perImageCB["gAlpha"] = mAlpha;
             perImageCB["gMomentsAlpha"] = mMomentsAlpha;
 
-            mpAtrousFbo->attachColorTarget(pCurrIterIllumTexture, 0);
+            mpCurReprojFbo->attachColorTarget(pCurrIterIllumTexture, 0);
             mpReprojection->execute(pRenderContext, mpCurReprojFbo);
             std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
         }
@@ -296,7 +296,7 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
         {
             auto perImageCB = mpFilterMoments["PerImageCB"];
 
-            perImageCB["gIllumination"] = pPrevFrameIllumTexture;
+            perImageCB["gIllumination"] = pPrevIterIllumTexture;
             perImageCB["gMoments"] = mpCurReprojFbo->getColorTexture(1);
             perImageCB["gHistoryLength"] = mpCurReprojFbo->getColorTexture(2);
             perImageCB["gLinearZAndNormal"] = mpLinearZAndNormalFbo->getColorTexture(0);
@@ -304,7 +304,7 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
             perImageCB["gPhiColor"] = mPhiColor;
             perImageCB["gPhiNormal"] = mPhiNormal;
 
-            mpCurReprojFbo->attachColorTarget(pCurrIterIllumTexture, 0);
+            mpAtrousFbo->attachColorTarget(pCurrIterIllumTexture, 0);
             mpFilterMoments->execute(pRenderContext, mpAtrousFbo);
             std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
         }
