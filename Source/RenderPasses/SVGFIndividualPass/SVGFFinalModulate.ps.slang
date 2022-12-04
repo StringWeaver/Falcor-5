@@ -55,7 +55,7 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     const int2 ipos = int2(vsOut.posH.xy);
     psOut.outColor = (gDiffuseReflectance[ipos].rgb + gSpecularReflectance[ipos].rgb) * gIllumination[ipos].rgb + gEmission[ipos].rgb;
     psOut.outCoefficientOfVariation = 0.1f * gIllumination[ipos].a / (gMoments[ipos].r + 1e-5);
-    psOut.outDbgView1 = gMoments[ipos].g;
+    psOut.outDbgView1 = gHistoryLength[ipos].r * gAlpha;
     psOut.outDbgView2 = gMoments[ipos].r;
     return psOut;
 }

@@ -87,40 +87,23 @@ bool loadPrevData(float2 posH, out float4 prevIllum, out float2 prevMoments, out
      const float2 posPrev = posH.xy + motion.xy * imageDim;
      const int2 iposPrev = int2(posPrev);
 
-    float2 depth = gLinearZAndNormal[ipos].xy;
+    float2 ZAndFwidthZ = gLinearZAndNormal[ipos].xy;
     float3 normal = oct_to_ndir_snorm(gLinearZAndNormal[ipos].zw);
 
-    prevIllum   = float4(0,0,0,0);
-    prevMoments = float2(0, 0);
-    historyLength = 0.0;
 
-    bool v[4];
-    
-    const float2 offset[4] = { float2(-0.5, -0.5), float2(0.5, -0.5), float2(-0.5, 0.5), float2(0.5, 0.5) };
-
-    // check for all 4 taps of the bilinear filter for validity
-    bool valid = false;
-    float sumw = 0;
-    for (int tapIdx = 0; tapIdx < 4; tapIdx++)
-    {
-        int2 tapIpos = int2(posPrev + offset[tapIdx]);
-        float2 tapCenter = tapIpos + float2(0.5, 0.5);
-        float tapWeight = (1.0 - abs(posPrev.x - tapCenter.x)) * (1.0 - abs(posPrev.y - tapCenter.y));
-        float2 depthPrev = gPrevLinearZAndNormal[tapIpos].xy;
-        float3 normalPrev = oct_to_ndir_snorm(gPrevLinearZAndNormal[tapIpos].zw);
-
-        if (isReprjValid(tapIpos, depth.x, depthPrev.x, depth.y, normal, normalPrev, normalFwidth)) {
-            prevIllum += tapWeight * gPrevIllum[tapIpos];
-            prevMoments += tapWeight * gPrevMoments[tapIpos].xy;
-            historyLength += tapWeight * gPrevHistoryLength[tapIpos].x;
-            sumw += tapWeight;
-        };
+    float2 prevZAndFwidthZ = gPrevLinearZAndNormal[iposPrev].xy;
+    float3 normalPrev = oct_to_ndir_snorm(gPrevLinearZAndNormal[iposPrev].zw);
+    if (isReprjValid(iposPrev, ZAndFwidthZ.x, prevZAndFwidthZ.x, ZAndFwidthZ.y, normal, normalPrev, normalFwidth)) {
+        prevIllum = gPrevIllum[iposPrev];
+        prevMoments = gPrevMoments[iposPrev].xy;
+        historyLength = gPrevHistoryLength[iposPrev].x + 1.0f;
+        return true;
+    } else {
+        prevIllum = float4(0, 0, 0, 0);
+        prevMoments = float2(0, 0);
+        historyLength = 1.0f;
+        return false;
     }
-    valid = (sumw >= 0.01);
-    prevIllum = valid ? prevIllum / sumw : float4(0, 0, 0, 0);
-    prevMoments = valid ? prevMoments / sumw : float2(0, 0);
-    historyLength = valid ? historyLength / sumw : 0.0;
-    return valid;
 }
 
 // not used currently
@@ -153,14 +136,14 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     float4 prevIllumination;
     float2 prevMoments;
     bool success = loadPrevData(posH.xy, prevIllumination, prevMoments, historyLength);
-    historyLength = min(32.0f, success ? historyLength + 1.0f : 1.0f);
+    historyLength = min(32.0f, historyLength);
 
     // this adjusts the alpha for the case where insufficient history is available.
     // It boosts the temporal accumulation to give the samples equal weights in
     // the beginning.
     // Alpha is the weight of current frame
-    const float alpha        = success ? max(gAlpha,        1.0 / historyLength) : 1.0;
-    const float alphaMoments = success ? max(gMomentsAlpha, 1.0 / historyLength) : 1.0;
+    const float alpha        = max(gAlpha,        1.0 / historyLength);
+    const float alphaMoments = max(gMomentsAlpha, 1.0 / historyLength);
 
     // compute first two moments of luminance
     float2 moments;
