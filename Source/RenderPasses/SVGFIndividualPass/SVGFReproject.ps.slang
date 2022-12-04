@@ -46,13 +46,11 @@ cbuffer PerImageCB
     Texture2D   gSpecularReflectance;
     Texture2D   gEmission;
     Texture2D   gPrevIllum;
-    Texture2D   gPrevMoments;
     Texture2D   gLinearZAndNormal;
     Texture2D   gPrevLinearZAndNormal;
     Texture2D   gPrevHistoryLength;
 
     float       gAlpha;
-    float       gMomentsAlpha;
 };
 
 float3 demodulate(float3 c, float3 albedo)
@@ -76,7 +74,7 @@ bool isReprjValid(int2 coord, float Z, float Zprev, float fwidthZ, float3 normal
     return true;
 }
 
-bool loadPrevData(float2 posH, out float4 prevIllum, out float2 prevMoments, out float historyLength)
+bool loadPrevData(float2 posH, out float4 prevIllum, out float historyLength)
 {
     const int2 ipos = posH;
     const float2 imageDim = float2(getTextureDims(gColor, 0));
@@ -95,12 +93,10 @@ bool loadPrevData(float2 posH, out float4 prevIllum, out float2 prevMoments, out
     float3 normalPrev = oct_to_ndir_snorm(gPrevLinearZAndNormal[iposPrev].zw);
     if (isReprjValid(iposPrev, ZAndFwidthZ.x, prevZAndFwidthZ.x, ZAndFwidthZ.y, normal, normalPrev, normalFwidth)) {
         prevIllum = gPrevIllum[iposPrev];
-        prevMoments = gPrevMoments[iposPrev].xy;
         historyLength = gPrevHistoryLength[iposPrev].x + 1.0f;
         return true;
     } else {
         prevIllum = float4(0, 0, 0, 0);
-        prevMoments = float2(0, 0);
         historyLength = 1.0f;
         return false;
     }
@@ -115,9 +111,8 @@ float computeVarianceScale(float numSamples, float loopLength, float alpha)
 
 struct PS_OUT
 {
-    float4 OutIllumination  : SV_TARGET0;
-    float2 OutMoments       : SV_TARGET1;
-    float  OutHistoryLength : SV_TARGET2;
+    float4 OutIllumination : SV_TARGET0;
+    float OutHistoryLength       : SV_TARGET1;
 };
 
 PS_OUT main(FullScreenPassVsOut vsOut)
@@ -134,8 +129,7 @@ PS_OUT main(FullScreenPassVsOut vsOut)
 
     float historyLength;
     float4 prevIllumination;
-    float2 prevMoments;
-    bool success = loadPrevData(posH.xy, prevIllumination, prevMoments, historyLength);
+    bool success = loadPrevData(posH.xy, prevIllumination, historyLength);
     historyLength = min(32.0f, historyLength);
 
     // this adjusts the alpha for the case where insufficient history is available.
@@ -143,27 +137,14 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     // the beginning.
     // Alpha is the weight of current frame
     const float alpha        = max(gAlpha,        1.0 / historyLength);
-    const float alphaMoments = max(gMomentsAlpha, 1.0 / historyLength);
 
-    // compute first two moments of luminance
-    float2 moments;
-    moments.r = luminance(illumination);
-    moments.g = moments.r * moments.r;
-
-    // temporal integration of the moments
-    moments = lerp(prevMoments, moments, alphaMoments);
-
-    float variance = max(0.f, moments.g - moments.r * moments.r);
-
-    //variance *= computeVarianceScale(16, 16, alpha);
-
+    // variance *= computeVarianceScale(16, 16, alpha);
+    const float illuminationLuminance = luminance(illumination);
+    const float secondMoment = illuminationLuminance * illuminationLuminance;
     PS_OUT psOut;
     // temporal integration of illumination
-    psOut.OutIllumination = lerp(prevIllumination,   float4(illumination,   0), alpha);
-    // variance is propagated through the alpha channel
-    psOut.OutIllumination.a = variance;
-    psOut.OutMoments = moments;
+    // 2nd moment is propagated through the alpha channel
+    psOut.OutIllumination = lerp(prevIllumination,   float4(illumination, secondMoment), alpha);
     psOut.OutHistoryLength = historyLength;
-
     return psOut;
 }

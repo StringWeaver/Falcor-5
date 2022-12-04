@@ -34,7 +34,6 @@ cbuffer PerImageCB
     Texture2D   gSpecularReflectance;
     Texture2D   gEmission;
     Texture2D   gIllumination;
-    Texture2D   gMoments;
     Texture2D   gHistoryLength;
     float gAlpha;
     
@@ -53,9 +52,13 @@ PS_OUT main(FullScreenPassVsOut vsOut)
 {
     PS_OUT psOut;
     const int2 ipos = int2(vsOut.posH.xy);
+    float4 illumination = gIllumination[ipos];
+    float firstMoment = luminance(illumination.rgb);
+    float secondMoment = illumination.a;
+    float variance = secondMoment - firstMoment * firstMoment;
     psOut.outColor = (gDiffuseReflectance[ipos].rgb + gSpecularReflectance[ipos].rgb) * gIllumination[ipos].rgb + gEmission[ipos].rgb;
-    psOut.outCoefficientOfVariation = 0.1f * gIllumination[ipos].a / (gMoments[ipos].r + 1e-5);
+    psOut.outCoefficientOfVariation = 0.01f * variance / (firstMoment + 1e-5);
     psOut.outDbgView1 = gHistoryLength[ipos].r * gAlpha;
-    psOut.outDbgView2 = gMoments[ipos].r;
+    psOut.outDbgView2 = 0.5f * variance;
     return psOut;
 }

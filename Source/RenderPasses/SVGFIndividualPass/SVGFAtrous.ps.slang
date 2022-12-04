@@ -40,7 +40,8 @@ cbuffer PerImageCB
     float       gPhiColor;
     float       gPhiNormal;
     float       epsVariance;
-    float       epsMoment;
+    float epsMoment;
+    bool isFirstIteration;
 };
 
 // computes a 3x3 gaussian blur of the variance, centered around
@@ -74,16 +75,21 @@ float4 main(FullScreenPassVsOut vsOut) : SV_TARGET0
     const int2 screenSize = getTextureDims(gHistoryLength, 0);
     const float kernelWeights[3] = { 1.0, 2.0 / 3.0, 1.0 / 6.0 };
 
-    // constant samplers to prevent the compiler from generating code which
-    // fetches the sampler descriptor from memory for each texture access
-    const float4 illuminationCenter = gIllumination.Load(int3(ipos, 0));
-    const float lIlluminationCenter = luminance(illuminationCenter.rgb);
-
-    // variance, filtered using 3x3 gaussin blur
-    const float var = computeVarianceCenter(ipos);
-
-    // number of temporally integrated pixels
-    const float historyLength = gHistoryLength[ipos].x;
+    float phiLIllumination;
+    float4 illuminationCenter = gIllumination.Load(int3(ipos, 0));
+    float variance;
+    const float illuminationLuminanceCenter = luminance(illuminationCenter.rgb);
+    if (isFirstIteration && gHistoryLength[ipos].x <= 4) {
+        variance = 1.0;
+        phiLIllumination = gPhiColor;
+    } else {
+        // constant samplers to prevent the compiler from generating code which
+        // fetches the sampler descriptor from memory for each texture access
+        const float firstMoment = illuminationLuminanceCenter;
+        const float secondMoment = illuminationCenter.a;
+        variance = secondMoment - firstMoment * firstMoment;
+        phiLIllumination = gPhiColor * sqrt(max(0.0, epsVariance + variance));
+    }
 
     const float2 zCenter = gLinearZAndNormal[ipos].xy;
     if (zCenter.x < 0)
@@ -93,7 +99,6 @@ float4 main(FullScreenPassVsOut vsOut) : SV_TARGET0
     }
     const float3 nCenter = oct_to_ndir_snorm(gLinearZAndNormal[ipos].zw);
 
-    const float phiLIllumination   = gPhiColor * sqrt(max(0.0, epsVariance + var.r));
     const float phiDepth     = max(zCenter.y, 1e-8) * gStepSize;
 
     // explicitly store/accumulate center pixel with weight 1 to prevent issues
@@ -106,12 +111,12 @@ float4 main(FullScreenPassVsOut vsOut) : SV_TARGET0
         for (int xx = -2; xx <= 2; xx++)
         {
             const int2 p     = ipos + int2(xx, yy) * gStepSize;
-            const bool inside = all(p >= int2(0,0)) && all(p < screenSize);
-
-            const float kernel = kernelWeights[abs(xx)] * kernelWeights[abs(yy)];
-
-            if (inside && (xx != 0 || yy != 0)) // skip center pixel, it is already accumulated
+            const bool inside = all(p >= int2(0, 0)) && all(p < screenSize);
+            const bool samePixel = (xx == 0 && yy == 0);
+            
+            if (inside && !samePixel) // skip center pixel, it is already accumulated
             {
+                const float kernel = kernelWeights[abs(xx)] * kernelWeights[abs(yy)];
                 const float4 illuminationP = gIllumination.Load(int3(p, 0));
                 const float lIlluminationP = luminance(illuminationP.rgb);
                 const float zP = gLinearZAndNormal[p].x;
@@ -121,19 +126,18 @@ float4 main(FullScreenPassVsOut vsOut) : SV_TARGET0
                 const float2 w = computeWeight(
                     zCenter.x, zP, phiDepth * length(float2(xx, yy)),
                     nCenter, nP, gPhiNormal,
-                    lIlluminationCenter, lIlluminationP, phiLIllumination);
+                    illuminationLuminanceCenter, lIlluminationP, phiLIllumination);
 
                 const float wIllumination = w.x * kernel;
 
-                // alpha channel contains the variance, therefore the weights need to be squared, see paper for the formula
                 sumWIllumination  += wIllumination;
-                sumIllumination   += float4(wIllumination.xxx, wIllumination * wIllumination) * illuminationP;
+                sumIllumination   += wIllumination * illuminationP;
             }
         }
     }
 
     // renormalization is different for variance, check paper for the formula
-    float4 filteredIllumination = float4(sumIllumination / float4(sumWIllumination.xxx, sumWIllumination * sumWIllumination));
+    float4 filteredIllumination = sumIllumination / sumWIllumination;
 
     return filteredIllumination;
 }

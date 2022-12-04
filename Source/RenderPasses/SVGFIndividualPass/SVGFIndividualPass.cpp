@@ -71,7 +71,6 @@ namespace
     // Internal buffer names
     const char kInternalBufferPreviousLinearZAndNormal[] = "Previous Linear Z and Packed Normal";
     const char kInternalBufferPreviousLighting[] = "Previous Lighting";
-    const char kInternalBufferPreviousMoments[] = "Previous Moments";
     const char kInternalBufferAtrousResult0[] = "Atrous Result0";
     const char kInternalBufferAtrousResult1[] = "Atrous Result1";
 
@@ -118,9 +117,8 @@ SVGFIndividualPass::SVGFIndividualPass(const Dictionary& dict)
     mpPackLinearZAndNormal = FullScreenPass::create(kPackLinearZAndNormalShader);
     mpReprojection = FullScreenPass::create(kReprojectShader);
     mpAtrous = FullScreenPass::create(kAtrousShader);
-    mpFilterMoments = FullScreenPass::create(kFilterMomentShader);
     mpFinalModulate = FullScreenPass::create(kFinalModulateShader);
-    FALCOR_ASSERT(mpPackLinearZAndNormal && mpReprojection && mpAtrous && mpFilterMoments && mpFinalModulate);
+    FALCOR_ASSERT(mpPackLinearZAndNormal && mpReprojection && mpAtrous && mpFinalModulate);
 }
 
 Dictionary SVGFIndividualPass::getScriptingDictionary()
@@ -170,9 +168,6 @@ RenderPassReflection SVGFIndividualPass::reflect(const CompileData& compileData)
     reflector.addInternal(kInternalBufferPreviousLighting, "Previous Filtered Lighting")
         .format(ResourceFormat::RGBA32Float)
         .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
-    reflector.addInternal(kInternalBufferPreviousMoments, "Previous Moments")
-        .format(ResourceFormat::RG32Float)
-        .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
     reflector.addInternal(kInternalBufferAtrousResult0, kInternalBufferAtrousResult0)
         .format(ResourceFormat::RGBA32Float)
         .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
@@ -196,8 +191,7 @@ void SVGFIndividualPass::compile(RenderContext* pRenderContext, const CompileDat
         // RG32F for the luminance moments, and one that is R16F.
         Fbo::Desc desc;
         desc.setSampleCount(0);
-        desc.setColorTarget(1, Falcor::ResourceFormat::RG32Float);   // moments
-        desc.setColorTarget(2, Falcor::ResourceFormat::R16Float);    // history length
+        desc.setColorTarget(1, Falcor::ResourceFormat::R16Float);    // history length
         mpCurReprojFbo = Fbo::create2D(dim.x, dim.y, desc);
         mpPrevReprojFbo = Fbo::create2D(dim.x, dim.y, desc);
     }
@@ -213,8 +207,6 @@ void SVGFIndividualPass::compile(RenderContext* pRenderContext, const CompileDat
         // Screen-size FBOs with 1 RGBA32F buffer
         Fbo::Desc desc;
         mpAtrousFbo = Fbo::create2D(dim.x, dim.y, desc);
-        desc.setColorTarget(0, Falcor::ResourceFormat::RGBA32Float); //color
-        desc.setColorTarget(1, Falcor::ResourceFormat::R16Float);  //Coefficient of Variation
         mpFinalFbo = Fbo::create2D(dim.x, dim.y, desc);
     }
 
@@ -277,37 +269,18 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
             perImageCB["gSpecularReflectance"] = pSpecularReflectanceTexture;
             perImageCB["gPositionNormalFwidth"] = pPosNormalFwidthTexture;
             perImageCB["gPrevIllum"] = pPrevFrameIllumTexture;
-            perImageCB["gPrevMoments"] = mpPrevReprojFbo->getColorTexture(1);
-            perImageCB["gPrevHistoryLength"] = mpPrevReprojFbo->getColorTexture(2);
+            perImageCB["gPrevHistoryLength"] = mpPrevReprojFbo->getColorTexture(1);
             perImageCB["gLinearZAndNormal"] = mpLinearZAndNormalFbo->getColorTexture(0);
             perImageCB["gPrevLinearZAndNormal"] = pPrevLinearZAndNormalTexture;
 
             // Setup variables for our reprojection pass
             perImageCB["gAlpha"] = mAlpha;
-            perImageCB["gMomentsAlpha"] = mMomentsAlpha;
 
             mpCurReprojFbo->attachColorTarget(pCurrIterIllumTexture, 0);
             mpReprojection->execute(pRenderContext, mpCurReprojFbo);
             std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
         }
-        // Do a first cross-bilateral filtering of the illumination and
-        // estimate its variance, storing the result into a float4 in
-        // pCurrIterIllumTexture.  Takes mpCurReprojFbo as input.
-        {
-            auto perImageCB = mpFilterMoments["PerImageCB"];
-
-            perImageCB["gIllumination"] = pPrevIterIllumTexture;
-            perImageCB["gMoments"] = mpCurReprojFbo->getColorTexture(1);
-            perImageCB["gHistoryLength"] = mpCurReprojFbo->getColorTexture(2);
-            perImageCB["gLinearZAndNormal"] = mpLinearZAndNormalFbo->getColorTexture(0);
-
-            perImageCB["gPhiColor"] = mPhiColor;
-            perImageCB["gPhiNormal"] = mPhiNormal;
-
-            mpAtrousFbo->attachColorTarget(pCurrIterIllumTexture, 0);
-            mpFilterMoments->execute(pRenderContext, mpAtrousFbo);
-            std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
-        }
+        
 
         // Filter illumination from pPrevIterIllumTexture, storing the result
         // in pCurrIterIllumTexture.  Along the way (or at the end, depending on
@@ -315,7 +288,7 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
         // next time into mpFilteredPastFbo.
         {
             auto perImageCB = mpAtrous["PerImageCB"];
-            perImageCB["gHistoryLength"] = mpCurReprojFbo->getColorTexture(2);
+            perImageCB["gHistoryLength"] = mpCurReprojFbo->getColorTexture(1);
             perImageCB["gLinearZAndNormal"] = mpLinearZAndNormalFbo->getColorTexture(0);
 
             perImageCB["gPhiColor"] = mPhiColor;
@@ -329,6 +302,7 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
 
                 perImageCB["gIllumination"] = pPrevIterIllumTexture;
                 perImageCB["gStepSize"] = 1 << i;
+                perImageCB["isFirstIteration"] = (i == 0);
                 mpAtrousFbo->attachColorTarget(pCurrIterIllumTexture, 0);
 
                 mpAtrous->execute(pRenderContext, mpAtrousFbo);
@@ -355,8 +329,7 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
         perImageCB["gSpecularReflectance"] = pSpecularReflectanceTexture;
         perImageCB["gEmission"] = pEmissionTexture;
         perImageCB["gIllumination"] = pPrevIterIllumTexture;
-        perImageCB["gMoments"] = mpCurReprojFbo->getColorTexture(1);
-        perImageCB["gHistoryLength"] = mpCurReprojFbo->getColorTexture(2);
+        perImageCB["gHistoryLength"] = mpCurReprojFbo->getColorTexture(1);
         perImageCB["gAlpha"] = mAlpha;
         mpFinalFbo->attachColorTarget(pOutputColorTexture, 0);
         mpFinalFbo->attachColorTarget(pOutputCoefficientOfVariationTexture, 1);
@@ -386,7 +359,6 @@ void SVGFIndividualPass::clearBuffers(RenderContext* pRenderContext, const Rende
 
     pRenderContext->clearTexture(renderData[kInternalBufferPreviousLinearZAndNormal]->asTexture().get());
     pRenderContext->clearTexture(renderData[kInternalBufferPreviousLighting]->asTexture().get());
-    pRenderContext->clearTexture(renderData[kInternalBufferPreviousMoments]->asTexture().get());
     pRenderContext->clearTexture(renderData[kInternalBufferAtrousResult0]->asTexture().get());
     pRenderContext->clearTexture(renderData[kInternalBufferAtrousResult1]->asTexture().get());
     pRenderContext->clearTexture(renderData[kOutputBufferCoefficientOfVariation]->asTexture().get());
@@ -424,7 +396,6 @@ void SVGFIndividualPass::renderUI(Gui::Widgets& widget)
     widget.text("How much history should be used?");
     widget.text("    (alpha; 0 = full reuse; 1 = no reuse)");
     dirty |= (int)widget.var("Alpha", mAlpha, 0.0f, 1.0f, 0.001f);
-    dirty |= (int)widget.var("Moments Alpha", mMomentsAlpha, 0.0f, 1.0f, 0.001f);
 
     
 
