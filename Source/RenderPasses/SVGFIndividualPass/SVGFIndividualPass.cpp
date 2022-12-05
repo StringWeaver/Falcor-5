@@ -276,9 +276,8 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
             // Setup variables for our reprojection pass
             perImageCB["gAlpha"] = mAlpha;
 
-            mpCurReprojFbo->attachColorTarget(pCurrIterIllumTexture, 0);
+            mpCurReprojFbo->attachColorTarget(pPrevIterIllumTexture, 0);
             mpReprojection->execute(pRenderContext, mpCurReprojFbo);
-            std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
         }
         
 
@@ -381,7 +380,7 @@ void SVGFIndividualPass::renderUI(Gui::Widgets& widget)
     widget.text("Number of filter iterations.  Which");
     widget.text("    iteration feeds into future frames?");
     dirty |= (int)widget.var("Iterations", mFilterIterations, 0, 10, 1);
-    dirty |= (int)widget.var("Feedback", mFeedbackTap, -1, mFilterIterations - 2, 1);
+    dirty |= (int)widget.var("Feedback Iteration Index", mFeedbackTap, -1, mFilterIterations - 1, 1);
 
     widget.text("");
     widget.text("Contol edge stopping on bilateral fitler");
