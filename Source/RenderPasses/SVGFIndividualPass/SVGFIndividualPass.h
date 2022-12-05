@@ -62,6 +62,7 @@ private:
     float   mPhiNormal           = 128.0f;
     float   mAlpha               = 0.05f;
     float   mMomentsAlpha        = 0.2f;
+    bool mPrevHistoryLengthTextureIndex = 0;
 
     // SVGF passes
     FullScreenPass::SharedPtr mpPackLinearZAndNormal;
@@ -73,8 +74,7 @@ private:
     // Intermediate framebuffers
     Fbo::SharedPtr mpAtrousFbo;
     Fbo::SharedPtr mpLinearZAndNormalFbo;
-    Fbo::SharedPtr mpCurReprojFbo;
-    Fbo::SharedPtr mpPrevReprojFbo;
+    Fbo::SharedPtr mpReprojFbo;
     Fbo::SharedPtr mpFilteredIlluminationFbo;
     Fbo::SharedPtr mpFinalFbo;
 };
