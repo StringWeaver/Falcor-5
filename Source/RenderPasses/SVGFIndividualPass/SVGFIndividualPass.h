@@ -60,7 +60,7 @@ private:
     float   mMomentEpsilon     = 1e-3f;
     float   mPhiColor            = 10.0f;
     float   mPhiNormal           = 128.0f;
-    float   mAlpha               = 0.05f;
+    float   mMaxHistoryLength               = 0.05f;
     float   mMomentsAlpha        = 0.2f;
     bool mPrevHistoryLengthTextureIndex = 0;
 

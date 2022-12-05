@@ -53,8 +53,7 @@ namespace
     const char kCoefficientOfVariationEpsilon[] = "CoefficientOfVariationEpsilon";
     const char kPhiColor[] = "PhiColor";
     const char kPhiNormal[] = "PhiNormal";
-    const char kAlpha[] = "Alpha";
-    const char kMomentsAlpha[] = "MomentsAlpha";
+    const char kMaxHistoryLength[] = "MaxHistoryLength";
 
     // Input buffer names
     const char kInputBufferDiffuseReflectance[] = "DiffuseReflectance";
@@ -108,8 +107,7 @@ SVGFIndividualPass::SVGFIndividualPass(const Dictionary& dict)
         else if (key == kCoefficientOfVariationEpsilon) mMomentEpsilon = value;
         else if (key == kPhiColor) mPhiColor = value;
         else if (key == kPhiNormal) mPhiNormal = value;
-        else if (key == kAlpha) mAlpha = value;
-        else if (key == kMomentsAlpha) mMomentsAlpha = value;
+        else if (key == kMaxHistoryLength) mMaxHistoryLength = value;
         else logWarning("Unknown field '{}' in SVGFIndividualPass dictionary.", key);
     }
 
@@ -130,8 +128,7 @@ Dictionary SVGFIndividualPass::getScriptingDictionary()
     dict[kCoefficientOfVariationEpsilon] = mMomentEpsilon;
     dict[kPhiColor] = mPhiColor;
     dict[kPhiNormal] = mPhiNormal;
-    dict[kAlpha] = mAlpha;
-    dict[kMomentsAlpha] = mMomentsAlpha;
+    dict[kMaxHistoryLength] = mMaxHistoryLength;
     return dict;
 }
 
@@ -280,7 +277,7 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
             perImageCB["gPrevLinearZAndNormal"] = pPrevLinearZAndNormalTexture;
 
             // Setup variables for our reprojection pass
-            perImageCB["gAlpha"] = mAlpha;
+            perImageCB["gMaxHistoryLength"] = mMaxHistoryLength;
 
             mpReprojFbo->attachColorTarget(pPrevIterIllumTexture, 0);
             mpReprojFbo->attachColorTarget(pHistoryLengthTexture, 1);
@@ -302,7 +299,10 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
             perImageCB["epsVariance"] = mVarainceEpsilon;
             perImageCB["epsMoment"] = mMomentEpsilon;
 
-            bool isPrevIllumCopied = false;
+            if (mFeedbackTap < 0 || mFilterIterations < 1)
+            {
+                pRenderContext->blit(pPrevIterIllumTexture->getSRV(), pPrevFrameIllumTexture->getRTV());
+            }
             for (int i = 0; i < mFilterIterations; i++)
             {
 
@@ -317,16 +317,12 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
                 if (i == std::min(mFeedbackTap, mFilterIterations - 1))
                 {
                     pRenderContext->blit(pCurrIterIllumTexture->getSRV(), pPrevFrameIllumTexture->getRTV());
-                    isPrevIllumCopied = true;
                 }
 
                 std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
             }
 
-            if (!isPrevIllumCopied)
-            {
-                pRenderContext->blit(pPrevIterIllumTexture->getSRV(), pPrevFrameIllumTexture->getRTV());
-            }
+            
         }
 
         // Compute albedo * filtered illumination and add emission back in.
@@ -334,7 +330,7 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
         perImageCB["gDiffuseReflectance"] = pDiffuseReflectanceTexture;
         perImageCB["gIllumination"] = pPrevIterIllumTexture;
         perImageCB["gHistoryLength"] = pHistoryLengthTexture;
-        perImageCB["gAlpha"] = mAlpha;
+        perImageCB["gMaxHistoryLength"] = mMaxHistoryLength;
         mpFinalFbo->attachColorTarget(pOutputColorTexture, 0);
         mpFinalFbo->attachColorTarget(pOutputCoefficientOfVariationTexture, 1);
         mpFinalFbo->attachColorTarget(pOutputDebugView1Texture, 2);
@@ -385,7 +381,7 @@ void SVGFIndividualPass::renderUI(Gui::Widgets& widget)
     widget.text("Number of filter iterations.  Which");
     widget.text("    iteration feeds into future frames?");
     dirty |= (int)widget.var("Iterations", mFilterIterations, 0, 10, 1);
-    dirty |= (int)widget.var("Feedback Iteration Index", mFeedbackTap, 0, mFilterIterations - 1, 1);
+    dirty |= (int)widget.var("Feedback Iteration Index", mFeedbackTap, -1, mFilterIterations - 1, 1);
 
     widget.text("");
     widget.text("Contol edge stopping on bilateral fitler");
@@ -398,8 +394,8 @@ void SVGFIndividualPass::renderUI(Gui::Widgets& widget)
     
     widget.text("");
     widget.text("How much history should be used?");
-    widget.text("    (alpha; 0 = full reuse; 1 = no reuse)");
-    dirty |= (int)widget.var("Minimum Alpha", mAlpha, 0.0f, 1.0f, 0.001f);
+    widget.text("    (MaxHistoryLength;  1 = no reuse)");
+    dirty |= (int)widget.var("Max HistoryLength", mMaxHistoryLength, 1.0f, 32.0f, 1.0f);
 
     
 

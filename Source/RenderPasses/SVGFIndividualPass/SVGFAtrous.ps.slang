@@ -118,7 +118,7 @@ float4 main(FullScreenPassVsOut vsOut) : SV_TARGET0
             {
                 const float kernel = kernelWeights[abs(xx)] * kernelWeights[abs(yy)];
                 const float4 illuminationP = gIllumination.Load(int3(p, 0));
-                const float lIlluminationP = luminance(illuminationP.rgb);
+                const float illuminationLuminanceP = luminance(illuminationP.rgb);
                 const float zP = gLinearZAndNormal[p].x;
                 const float3 nP = oct_to_ndir_snorm(gLinearZAndNormal[p].zw);
 
@@ -126,7 +126,7 @@ float4 main(FullScreenPassVsOut vsOut) : SV_TARGET0
                 const float2 w = computeWeight(
                     zCenter.x, zP, phiDepth * length(float2(xx, yy)),
                     nCenter, nP, gPhiNormal,
-                    illuminationLuminanceCenter, lIlluminationP, phiLIllumination);
+                    illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
 
                 const float wIllumination = w.x * kernel;
 

@@ -48,7 +48,7 @@ cbuffer PerImageCB
     Texture2D   gPrevLinearZAndNormal;
     Texture2D   gPrevHistoryLength;
 
-    float       gAlpha;
+    float       gMaxHistoryLength;
 };
 
 float3 demodulate(float3 c, float3 albedo)
@@ -128,12 +128,9 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     float historyLength;
     float4 prevIllumination;
     bool success = loadPrevData(posH.xy, prevIllumination, historyLength);
-
-    // this adjusts the alpha for the case where insufficient history is available.
-    // It boosts the temporal accumulation to give the samples equal weights in
-    // the beginning.
+    historyLength = min(gMaxHistoryLength,historyLength);
     // Alpha is the weight of current frame
-    const float alpha        = max(gAlpha,        1.0 / historyLength);
+    const float alpha        =  1.0 / historyLength;
 
     // variance *= computeVarianceScale(16, 16, alpha);
     const float illuminationLuminance = luminance(illumination);

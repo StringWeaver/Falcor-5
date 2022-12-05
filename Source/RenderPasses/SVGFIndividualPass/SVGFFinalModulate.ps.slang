@@ -34,7 +34,7 @@ cbuffer PerImageCB
     Texture2D   gDiffuseReflectance;
     Texture2D   gIllumination;
     Texture2D   gHistoryLength;
-    float gAlpha;
+    float gMaxHistoryLength;
     
 };
 struct PS_OUT{
@@ -53,7 +53,7 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     float variance = secondMoment - firstMoment * firstMoment;
     psOut.outColor = gDiffuseReflectance[ipos].rgb  * gIllumination[ipos].rgb;
     psOut.outCoefficientOfVariation = 0.01f * variance / (firstMoment + 1e-5);
-    psOut.outDbgView1 = gHistoryLength[ipos].r * gAlpha;
+    psOut.outDbgView1 = gHistoryLength[ipos].r / gMaxHistoryLength;
     psOut.outDbgView2 = 0.5f * variance;
     return psOut;
 }
