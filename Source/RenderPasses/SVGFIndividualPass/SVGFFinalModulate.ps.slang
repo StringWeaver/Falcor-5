@@ -27,6 +27,7 @@
  **************************************************************************/
 import Scene.ShadingData;
 import SVGFCommon;
+import Utils.Color.ColorHelpers;
 
 cbuffer PerImageCB
 {
@@ -43,10 +44,6 @@ struct PS_OUT{
     float outCoefficientOfVariation : SV_TARGET1;
     float outDbgView1 : SV_TARGET2;
     float outDbgView2 : SV_TARGET3;
-}
-inline float luminance(float3 rgb)
-{
-    return dot(rgb, float3(0.2126f, 0.7152f, 0.0722f));
 }
 PS_OUT main(FullScreenPassVsOut vsOut) 
 {

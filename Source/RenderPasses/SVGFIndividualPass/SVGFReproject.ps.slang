@@ -130,7 +130,6 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     float historyLength;
     float4 prevIllumination;
     bool success = loadPrevData(posH.xy, prevIllumination, historyLength);
-    historyLength = min(32.0f, historyLength);
 
     // this adjusts the alpha for the case where insufficient history is available.
     // It boosts the temporal accumulation to give the samples equal weights in

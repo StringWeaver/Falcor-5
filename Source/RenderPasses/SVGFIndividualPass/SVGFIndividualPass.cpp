@@ -333,7 +333,7 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
 
             if (!isPrevIllumCopied)
             {
-                pRenderContext->blit(mpReprojFbo->getColorTexture(0)->getSRV(), pPrevFrameIllumTexture->getRTV());
+                pRenderContext->blit(pPrevIterIllumTexture->getSRV(), pPrevFrameIllumTexture->getRTV());
             }
         }
 
@@ -409,7 +409,7 @@ void SVGFIndividualPass::renderUI(Gui::Widgets& widget)
     widget.text("");
     widget.text("How much history should be used?");
     widget.text("    (alpha; 0 = full reuse; 1 = no reuse)");
-    dirty |= (int)widget.var("Alpha", mAlpha, 0.0f, 1.0f, 0.001f);
+    dirty |= (int)widget.var("Minimum Alpha", mAlpha, 0.0f, 1.0f, 0.001f);
 
     
 
