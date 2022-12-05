@@ -58,9 +58,7 @@ namespace
 
     // Input buffer names
     const char kInputBufferDiffuseReflectance[] = "DiffuseReflectance";
-    const char kInputBufferSpecularReflectance[] = "SpecularReflectance";
-    const char kInputBufferColor[] = "Color";
-    const char kInputBufferEmission[] = "Emission";
+    const char kInputBufferIllumination[] = "Illumination";
     const char kInputBufferWorldPosition[] = "WorldPosition";
     const char kInputBufferWorldNormal[] = "WorldNormal";
     const char kInputBufferPosNormalFwidth[] = "PositionNormalFwidth";
@@ -154,9 +152,7 @@ RenderPassReflection SVGFIndividualPass::reflect(const CompileData& compileData)
     RenderPassReflection reflector;
 
     reflector.addInput(kInputBufferDiffuseReflectance, "DiffuseReflectance");
-    reflector.addInput(kInputBufferSpecularReflectance, "SpecularReflectance");
-    reflector.addInput(kInputBufferColor, "Color");
-    reflector.addInput(kInputBufferEmission, "Emission");
+    reflector.addInput(kInputBufferIllumination, "Radiance");
     reflector.addInput(kInputBufferWorldPosition, "World Position");
     reflector.addInput(kInputBufferWorldNormal, "World Normal");
     reflector.addInput(kInputBufferPosNormalFwidth, "PositionNormalFwidth");
@@ -219,9 +215,7 @@ void SVGFIndividualPass::compile(RenderContext* pRenderContext, const CompileDat
 void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData& renderData)
 {
     Texture::SharedPtr pDiffuseReflectanceTexture = renderData[kInputBufferDiffuseReflectance]->asTexture();
-    Texture::SharedPtr pSpecularReflectanceTexture = renderData[kInputBufferSpecularReflectance]->asTexture();
-    Texture::SharedPtr pColorTexture = renderData[kInputBufferColor]->asTexture();
-    Texture::SharedPtr pEmissionTexture = renderData[kInputBufferEmission]->asTexture();
+    Texture::SharedPtr pIlluminationTexture = renderData[kInputBufferIllumination]->asTexture();
     Texture::SharedPtr pWorldPositionTexture = renderData[kInputBufferWorldPosition]->asTexture();
     Texture::SharedPtr pWorldNormalTexture = renderData[kInputBufferWorldNormal]->asTexture();
     Texture::SharedPtr pPosNormalFwidthTexture = renderData[kInputBufferPosNormalFwidth]->asTexture();
@@ -277,10 +271,8 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
 
             // Setup textures for our reprojection shader pass
             perImageCB["gMotion"] = pMotionVectorTexture;
-            perImageCB["gColor"] = pColorTexture;
-            perImageCB["gEmission"] = pEmissionTexture;
+            perImageCB["gIllumination"] = pIlluminationTexture;
             perImageCB["gDiffuseReflectance"] = pDiffuseReflectanceTexture;
-            perImageCB["gSpecularReflectance"] = pSpecularReflectanceTexture;
             perImageCB["gPositionNormalFwidth"] = pPosNormalFwidthTexture;
             perImageCB["gPrevIllum"] = pPrevFrameIllumTexture;
             perImageCB["gPrevHistoryLength"] = pPrevHistoryLengthTexture;
@@ -340,8 +332,6 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
         // Compute albedo * filtered illumination and add emission back in.
         auto perImageCB = mpFinalModulate["PerImageCB"];
         perImageCB["gDiffuseReflectance"] = pDiffuseReflectanceTexture;
-        perImageCB["gSpecularReflectance"] = pSpecularReflectanceTexture;
-        perImageCB["gEmission"] = pEmissionTexture;
         perImageCB["gIllumination"] = pPrevIterIllumTexture;
         perImageCB["gHistoryLength"] = pHistoryLengthTexture;
         perImageCB["gAlpha"] = mAlpha;
@@ -359,7 +349,7 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
     }
     else
     {
-        pRenderContext->blit(pColorTexture->getSRV(), pOutputColorTexture->getRTV());
+        pRenderContext->blit(pIlluminationTexture->getSRV(), pOutputColorTexture->getRTV());
     }
 }
 

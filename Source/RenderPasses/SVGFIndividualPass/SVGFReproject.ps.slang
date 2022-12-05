@@ -41,10 +41,8 @@ cbuffer PerImageCB
 {
     Texture2D   gMotion;
     Texture2D   gPositionNormalFwidth;
-    Texture2D   gColor;
+    Texture2D   gIllumination;
     Texture2D   gDiffuseReflectance;
-    Texture2D   gSpecularReflectance;
-    Texture2D   gEmission;
     Texture2D   gPrevIllum;
     Texture2D   gLinearZAndNormal;
     Texture2D   gPrevLinearZAndNormal;
@@ -60,7 +58,7 @@ float3 demodulate(float3 c, float3 albedo)
 
 bool isReprjValid(int2 coord, float Z, float Zprev, float fwidthZ, float3 normal, float3 normalPrev, float fwidthNormal)
 {
-    const int2 imageDim = getTextureDims(gColor, 0);
+    const int2 imageDim = getTextureDims(gIllumination, 0);
 
     // check whether reprojected pixel is inside of the screen
     if (any(coord < int2(1,1)) || any(coord > imageDim - int2(1,1))) return false;
@@ -77,7 +75,7 @@ bool isReprjValid(int2 coord, float Z, float Zprev, float fwidthZ, float3 normal
 bool loadPrevData(float2 posH, out float4 prevIllum, out float historyLength)
 {
     const int2 ipos = posH;
-    const float2 imageDim = float2(getTextureDims(gColor, 0));
+    const float2 imageDim = float2(getTextureDims(gIllumination, 0));
 
     const float2 motion = gMotion[ipos].xy;
     const float normalFwidth = gPositionNormalFwidth[ipos].y;
@@ -120,7 +118,7 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     const float4 posH = vsOut.posH;
     const int2 ipos = posH.xy;
 
-    float3 illumination = demodulate(gColor[ipos].rgb - gEmission[ipos].rgb, gDiffuseReflectance[ipos].rgb + gSpecularReflectance[ipos].rgb);
+    float3 illumination = gIllumination[ipos].rgb;
     // Workaround path tracer bugs. TODO: remove this when we can.
     if (isNaN(illumination.x) || isNaN(illumination.y) || isNaN(illumination.z))
     {

@@ -32,8 +32,6 @@ import Utils.Color.ColorHelpers;
 cbuffer PerImageCB
 {
     Texture2D   gDiffuseReflectance;
-    Texture2D   gSpecularReflectance;
-    Texture2D   gEmission;
     Texture2D   gIllumination;
     Texture2D   gHistoryLength;
     float gAlpha;
@@ -53,7 +51,7 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     float firstMoment = luminance(illumination.rgb);
     float secondMoment = illumination.a;
     float variance = secondMoment - firstMoment * firstMoment;
-    psOut.outColor = (gDiffuseReflectance[ipos].rgb + gSpecularReflectance[ipos].rgb) * gIllumination[ipos].rgb + gEmission[ipos].rgb;
+    psOut.outColor = gDiffuseReflectance[ipos].rgb  * gIllumination[ipos].rgb;
     psOut.outCoefficientOfVariation = 0.01f * variance / (firstMoment + 1e-5);
     psOut.outDbgView1 = gHistoryLength[ipos].r * gAlpha;
     psOut.outDbgView2 = 0.5f * variance;
