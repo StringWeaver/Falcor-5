@@ -61,7 +61,7 @@ bool isReprjValid(int2 coord, float Z, float Zprev, float fwidthZ, float3 normal
     const int2 imageDim = getTextureDims(gIllumination, 0);
 
     // check whether reprojected pixel is inside of the screen
-    if (any(coord < int2(1,1)) || any(coord > imageDim - int2(1,1))) return false;
+    if (any(coord < int2(0,0)) || any(coord >= imageDim)) return false;
 
     // check if deviation of depths is acceptable
     if (abs(Zprev - Z) / (fwidthZ + 1e-2f) > 10.f) return false;
