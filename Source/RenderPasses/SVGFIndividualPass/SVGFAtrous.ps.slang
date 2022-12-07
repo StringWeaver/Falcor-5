@@ -32,16 +32,17 @@ import SVGFCommon;
 
 cbuffer PerImageCB
 {
-    Texture2D   gHistoryLength;
-    Texture2D   gIllumination;
-    Texture2D   gLinearZAndNormal;
+    Texture2D gHistoryLength;
+    Texture2D gIllumination;
+    Texture2D gLinearZAndNormal;
 
-    int         gStepSize;
-    float       gPhiColor;
-    float       gPhiNormal;
-    float       epsVariance;
+    int gStepSize;
+    float gPhiColor;
+    float gPhiNormal;
+    float gPhiDepth;
+    float epsVariance;
     float epsMoment;
-    bool isFirstIteration;
+    bool gIteration;
 };
 
 // computes a 3x3 gaussian blur of the variance, centered around
@@ -51,7 +52,7 @@ float computeVarianceCenter(int2 ipos)
     float sum = 0.f;
 
     const float kernel[2][2] = {
-        { 1.0 / 4.0, 1.0 / 8.0  },
+        { 1.0 / 4.0, 1.0 / 8.0 },
         { 1.0 / 8.0, 1.0 / 16.0 }
     };
 
@@ -69,27 +70,25 @@ float computeVarianceCenter(int2 ipos)
     return sum;
 }
 
-float4 main(FullScreenPassVsOut vsOut) : SV_TARGET0
+float4 main(FullScreenPassVsOut vsOut)
+    : SV_TARGET0
 {
-    const int2 ipos       = int2(vsOut.posH.xy);
+    const int2 ipos = int2(vsOut.posH.xy);
     const int2 screenSize = getTextureDims(gHistoryLength, 0);
     const float kernelWeights[3] = { 1.0, 2.0 / 3.0, 1.0 / 6.0 };
 
     float phiLIllumination;
     float4 illuminationCenter = gIllumination.Load(int3(ipos, 0));
+    //float validSampleCountCenter = gHistoryLength[ipos].x;
     float variance;
     const float illuminationLuminanceCenter = luminance(illuminationCenter.rgb);
-    if (isFirstIteration && gHistoryLength[ipos].x <= 4) {
-        variance = 1.0;
-        phiLIllumination = gPhiColor;
-    } else {
-        // constant samplers to prevent the compiler from generating code which
-        // fetches the sampler descriptor from memory for each texture access
-        const float firstMoment = illuminationLuminanceCenter;
-        const float secondMoment = illuminationCenter.a;
-        variance = secondMoment - firstMoment * firstMoment;
-        phiLIllumination = gPhiColor * sqrt(max(0.0, epsVariance + variance));
-    }
+
+    // constant samplers to prevent the compiler from generating code which
+    // fetches the sampler descriptor from memory for each texture access
+    const float firstMoment = illuminationLuminanceCenter;
+    const float secondMoment = illuminationCenter.a;
+    variance = secondMoment - firstMoment * firstMoment;
+    phiLIllumination = gPhiColor;
 
     const float2 zCenter = gLinearZAndNormal[ipos].xy;
     if (zCenter.x < 0)
@@ -99,24 +98,25 @@ float4 main(FullScreenPassVsOut vsOut) : SV_TARGET0
     }
     const float3 nCenter = oct_to_ndir_snorm(gLinearZAndNormal[ipos].zw);
 
-    const float phiDepth     = max(zCenter.y, 1e-8) * gStepSize;
+    const float phiDepth = max(zCenter.y, 1e-8) * gPhiDepth;
 
     // explicitly store/accumulate center pixel with weight 1 to prevent issues
     // with the edge-stopping functions
-    float sumWIllumination   = 1.0;
-    float4  sumIllumination  = illuminationCenter;
+    float sumWIllumination = 1.0;
+    float4 sumIllumination = illuminationCenter;
 
-    for (int yy = -2; yy <= 2; yy++)
+    for (int yy = -1; yy <= 1; yy++)
     {
-        for (int xx = -2; xx <= 2; xx++)
+        for (int xx = -1; xx <= 1; xx++)
         {
-            const int2 p     = ipos + int2(xx, yy) * gStepSize;
+            const int2 p = ipos + int2(xx, yy) * gStepSize;
             const bool inside = all(p >= int2(0, 0)) && all(p < screenSize);
             const bool samePixel = (xx == 0 && yy == 0);
-            
-            if (inside && !samePixel) // skip center pixel, it is already accumulated
+
+            if (!samePixel && inside) // skip center pixel, it is already accumulated
             {
                 const float kernel = kernelWeights[abs(xx)] * kernelWeights[abs(yy)];
+
                 const float4 illuminationP = gIllumination.Load(int3(p, 0));
                 const float illuminationLuminanceP = luminance(illuminationP.rgb);
                 const float zP = gLinearZAndNormal[p].x;
@@ -124,14 +124,14 @@ float4 main(FullScreenPassVsOut vsOut) : SV_TARGET0
 
                 // compute the edge-stopping functions
                 const float2 w = computeWeight(
-                    zCenter.x, zP, phiDepth * length(float2(xx, yy)),
+                    zCenter.x, zP, phiDepth,
                     nCenter, nP, gPhiNormal,
                     illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
 
                 const float wIllumination = w.x * kernel;
 
-                sumWIllumination  += wIllumination;
-                sumIllumination   += wIllumination * illuminationP;
+                sumWIllumination += wIllumination;
+                sumIllumination += wIllumination * illuminationP;
             }
         }
     }

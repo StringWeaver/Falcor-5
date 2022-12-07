@@ -296,6 +296,7 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
 
             perImageCB["gPhiColor"] = mPhiColor;
             perImageCB["gPhiNormal"] = mPhiNormal;
+            perImageCB["gPhiDepth"] = mPhiDepth;
             perImageCB["epsVariance"] = mVarainceEpsilon;
             perImageCB["epsMoment"] = mMomentEpsilon;
 
@@ -307,8 +308,8 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
             {
 
                 perImageCB["gIllumination"] = pPrevIterIllumTexture;
-                perImageCB["gStepSize"] = 1 << i;
-                perImageCB["isFirstIteration"] = (i == 0);
+                perImageCB["gStepSize"] = int(pow(3,i));
+                perImageCB["gIteration"] = i;
                 mpAtrousFbo->attachColorTarget(pCurrIterIllumTexture, 0);
 
                 mpAtrous->execute(pRenderContext, mpAtrousFbo);
@@ -389,6 +390,7 @@ void SVGFIndividualPass::renderUI(Gui::Widgets& widget)
     widget.text("Contol edge stopping on bilateral fitler");
     dirty |= (int)widget.var("For Color", mPhiColor, 0.0f, 10000.0f, 0.01f);
     dirty |= (int)widget.var("For Normal", mPhiNormal, 0.001f, 1000.0f, 0.2f);
+    dirty |= (int)widget.var("For Depth", mPhiDepth, 0.001f, 30.0f);
 
     widget.text("Control epsilons");
     dirty |= (int)widget.var("Eps Variance", mVarainceEpsilon, 1e-10f, 1.0f, 0.000000001f);
