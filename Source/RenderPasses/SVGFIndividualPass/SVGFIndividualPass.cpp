@@ -223,7 +223,7 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
     Texture::SharedPtr pCurrIterIllumTexture = renderData[kInternalBufferAtrousResult1]->asTexture();
     Texture::SharedPtr pPrevHistoryLengthTexture;
     Texture::SharedPtr pHistoryLengthTexture;
-    if (!mPrevHistoryLengthTextureIndex) {
+    if (!mPrevFrameTextureIndex) {
         pPrevHistoryLengthTexture = renderData[kInternalBufferHistoryLength0]->asTexture();
         pHistoryLengthTexture = renderData[kInternalBufferHistoryLength1]->asTexture();
     }
@@ -231,7 +231,7 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
         pPrevHistoryLengthTexture = renderData[kInternalBufferHistoryLength1]->asTexture();
         pHistoryLengthTexture = renderData[kInternalBufferHistoryLength0]->asTexture();
     }
-    
+
 
     Texture::SharedPtr pOutputColorTexture = renderData[kOutputBufferFilteredImage]->asTexture();
     Texture::SharedPtr pOutputCoefficientOfVariationTexture = renderData[kOutputBufferCoefficientOfVariation]->asTexture();
@@ -291,7 +291,6 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
         // next time into mpFilteredPastFbo.
         {
             auto perImageCB = mpAtrous["PerImageCB"];
-            perImageCB["gHistoryLength"] = pHistoryLengthTexture;
             perImageCB["gLinearZAndNormal"] = mpLinearZAndNormalFbo->getColorTexture(0);
 
             perImageCB["gPhiColor"] = mPhiColor;
@@ -310,6 +309,7 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
                 perImageCB["gIllumination"] = pPrevIterIllumTexture;
                 perImageCB["gStepSize"] = int(pow(3,i));
                 perImageCB["gIteration"] = i;
+                perImageCB["gFeedbackIteration"] = mFeedbackTap;
                 mpAtrousFbo->attachColorTarget(pCurrIterIllumTexture, 0);
 
                 mpAtrous->execute(pRenderContext, mpAtrousFbo);
@@ -340,7 +340,7 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
 
 
         // Swap resources so we're ready for next frame.
-        mPrevHistoryLengthTextureIndex = !mPrevHistoryLengthTextureIndex;
+        mPrevFrameTextureIndex = !mPrevFrameTextureIndex;
         pRenderContext->blit(mpLinearZAndNormalFbo->getColorTexture(0)->getSRV(),
                              pPrevLinearZAndNormalTexture->getRTV());
     }

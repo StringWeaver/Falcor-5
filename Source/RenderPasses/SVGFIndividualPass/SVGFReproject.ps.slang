@@ -118,27 +118,29 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     const float4 posH = vsOut.posH;
     const int2 ipos = posH.xy;
 
-    float3 illumination = gIllumination[ipos].rgb;
+    float4 illumination = gIllumination[ipos];
     // Workaround path tracer bugs. TODO: remove this when we can.
     if (isNaN(illumination.x) || isNaN(illumination.y) || isNaN(illumination.z))
     {
-        illumination = float3(0, 0, 0);
+        illumination = float4(0, 0, 0, 0);
     }
 
     float historyLength;
     float4 prevIllumination;
     bool success = loadPrevData(posH.xy, prevIllumination, historyLength);
-    historyLength = min(gMaxHistoryLength,historyLength);
-    // Alpha is the weight of current frame
-    const float alpha        =  1.0 / historyLength;
+    const float eps = 1e-6;
+    if (historyLength - gMaxHistoryLength > 1.f - eps) {
+        prevIllumination *= gMaxHistoryLength / historyLength;
+        historyLength = gMaxHistoryLength;
+    }
+    const float spp = 1.f;
 
     // variance *= computeVarianceScale(16, 16, alpha);
-    const float illuminationLuminance = luminance(illumination);
-    const float secondMoment = illuminationLuminance * illuminationLuminance;
+    illumination.a = 1.f; //temporary, shoud modify pathtracer to get real spp of current component
     PS_OUT psOut;
     // temporal integration of illumination
     // 2nd moment is propagated through the alpha channel
-    psOut.OutIllumination = lerp(prevIllumination,   float4(illumination, secondMoment), alpha);
+    psOut.OutIllumination = prevIllumination + illumination;
     psOut.OutHistoryLength = historyLength;
     return psOut;
 }

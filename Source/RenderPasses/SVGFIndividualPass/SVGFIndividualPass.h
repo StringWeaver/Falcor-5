@@ -62,7 +62,7 @@ private:
     float   mPhiNormal           = 128.0f;
     float   mPhiDepth            = 5.f;
     float   mMaxHistoryLength               = 32.0f;
-    bool mPrevHistoryLengthTextureIndex = 0;
+    bool mPrevFrameTextureIndex = 0;
 
     // SVGF passes
     FullScreenPass::SharedPtr mpPackLinearZAndNormal;

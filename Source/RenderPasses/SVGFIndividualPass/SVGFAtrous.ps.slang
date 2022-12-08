@@ -32,7 +32,6 @@ import SVGFCommon;
 
 cbuffer PerImageCB
 {
-    Texture2D gHistoryLength;
     Texture2D gIllumination;
     Texture2D gLinearZAndNormal;
 
@@ -42,7 +41,8 @@ cbuffer PerImageCB
     float gPhiDepth;
     float epsVariance;
     float epsMoment;
-    bool gIteration;
+    int gIteration;
+    int gFeedbackIteration;
 };
 
 // computes a 3x3 gaussian blur of the variance, centered around
@@ -74,20 +74,18 @@ float4 main(FullScreenPassVsOut vsOut)
     : SV_TARGET0
 {
     const int2 ipos = int2(vsOut.posH.xy);
-    const int2 screenSize = getTextureDims(gHistoryLength, 0);
+    const int2 screenSize = getTextureDims(gIllumination, 0);
     const float kernelWeights[3] = { 1.0, 2.0 / 3.0, 1.0 / 6.0 };
 
     float phiLIllumination;
     float4 illuminationCenter = gIllumination.Load(int3(ipos, 0));
-    //float validSampleCountCenter = gHistoryLength[ipos].x;
-    float variance;
-    const float illuminationLuminanceCenter = luminance(illuminationCenter.rgb);
+    // float validSampleCountCenter = gHistoryLength[ipos].x;
+    const float illuminationLuminanceCenter = luminance(illuminationCenter.rgb / illuminationCenter.a);
 
     // constant samplers to prevent the compiler from generating code which
     // fetches the sampler descriptor from memory for each texture access
-    const float firstMoment = illuminationLuminanceCenter;
-    const float secondMoment = illuminationCenter.a;
-    variance = secondMoment - firstMoment * firstMoment;
+
+
     phiLIllumination = gPhiColor;
 
     const float2 zCenter = gLinearZAndNormal[ipos].xy;
@@ -118,7 +116,7 @@ float4 main(FullScreenPassVsOut vsOut)
                 const float kernel = kernelWeights[abs(xx)] * kernelWeights[abs(yy)];
 
                 const float4 illuminationP = gIllumination.Load(int3(p, 0));
-                const float illuminationLuminanceP = luminance(illuminationP.rgb);
+                const float illuminationLuminanceP = luminance(illuminationP.rgb / illuminationP.a);
                 const float zP = gLinearZAndNormal[p].x;
                 const float3 nP = oct_to_ndir_snorm(gLinearZAndNormal[p].zw);
 

@@ -51,7 +51,7 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     float firstMoment = luminance(illumination.rgb);
     float secondMoment = illumination.a;
     float variance = secondMoment - firstMoment * firstMoment;
-    psOut.outColor = gDiffuseReflectance[ipos].rgb  * gIllumination[ipos].rgb;
+    psOut.outColor = gDiffuseReflectance[ipos].rgb * gIllumination[ipos].rgb / gIllumination[ipos].a;
     psOut.outCoefficientOfVariation = 0.01f * variance / (firstMoment + 1e-5);
     psOut.outDbgView1 = gHistoryLength[ipos].r / gMaxHistoryLength;
     psOut.outDbgView2 = 0.5f * variance;
