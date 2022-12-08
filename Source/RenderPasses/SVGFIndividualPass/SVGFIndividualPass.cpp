@@ -65,7 +65,8 @@ namespace
     const char kInputBufferMotionVector[] = "MotionVec";
 
     // Internal buffer names
-    const char kInternalBufferPreviousLinearZAndNormal[] = "Previous Linear Z and Packed Normal";
+    const char kInternalBuffersLinearZAndNormal0[] = "Linear Z and Packed Normal 0";
+    const char kInternalBuffersLinearZAndNormal1[] = "Linear Z and Packed Normal 1";
     const char kInternalBufferPreviousLighting[] = "Previous Lighting";
     const char kInternalBufferHistoryLength0[] = "HistoryLength 0";
     const char kInternalBufferHistoryLength1[] = "HistroyLength 1";
@@ -156,7 +157,10 @@ RenderPassReflection SVGFIndividualPass::reflect(const CompileData& compileData)
     reflector.addInput(kInputBufferLinearZ, "LinearZ");
     reflector.addInput(kInputBufferMotionVector, "Motion vectors");
 
-    reflector.addInternal(kInternalBufferPreviousLinearZAndNormal, "Previous Linear Z and Packed Normal")
+    reflector.addInternal(kInternalBuffersLinearZAndNormal0, "Previous Linear Z and Packed Normal")
+        .format(ResourceFormat::RGBA32Float)
+        .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
+    reflector.addInternal(kInternalBuffersLinearZAndNormal1, "Previous Linear Z and Packed Normal")
         .format(ResourceFormat::RGBA32Float)
         .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
     reflector.addInternal(kInternalBufferPreviousLighting, "Previous Filtered Lighting")
@@ -177,7 +181,7 @@ RenderPassReflection SVGFIndividualPass::reflect(const CompileData& compileData)
 
     reflector.addOutput(kOutputBufferFilteredImage, "Filtered image").format(ResourceFormat::RGBA32Float);
     reflector.addOutput(kOutputBufferCoefficientOfVariation, "Coefficient of Variation").format(ResourceFormat::R16Float).bindFlags(Resource::BindFlags::RenderTarget);
-    reflector.addOutput(kOutputBufferDebugView1, kOutputBufferDebugView1).format(ResourceFormat::R16Float).bindFlags(Resource::BindFlags::RenderTarget);
+    reflector.addOutput(kOutputBufferDebugView1, kOutputBufferDebugView1).format(ResourceFormat::RGBA16Float).bindFlags(Resource::BindFlags::RenderTarget);
     reflector.addOutput(kOutputBufferDebugView2, kOutputBufferDebugView2).format(ResourceFormat::R16Float).bindFlags(Resource::BindFlags::RenderTarget);
 
     return reflector;
@@ -193,15 +197,9 @@ void SVGFIndividualPass::compile(RenderContext* pRenderContext, const CompileDat
     }
 
     {
-        // Screen-size RGBA32F buffer for linear Z, derivative, and packed normal
-        Fbo::Desc desc;
-        desc.setColorTarget(0, Falcor::ResourceFormat::RGBA32Float);
-        mpLinearZAndNormalFbo = Fbo::create2D(dim.x, dim.y, desc);
-    }
-
-    {
         // Screen-size FBOs with no buffer
         Fbo::Desc desc;
+        mpLinearZAndNormalFbo = Fbo::create2D(dim.x, dim.y, desc);
         mpAtrousFbo = Fbo::create2D(dim.x, dim.y, desc);
         mpFinalFbo = Fbo::create2D(dim.x, dim.y, desc);
     }
@@ -223,11 +221,17 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
     Texture::SharedPtr pCurrIterIllumTexture = renderData[kInternalBufferAtrousResult1]->asTexture();
     Texture::SharedPtr pPrevHistoryLengthTexture;
     Texture::SharedPtr pHistoryLengthTexture;
+    Texture::SharedPtr pPrevFrameLinearZAndNormalTexture;
+    Texture::SharedPtr pLinearZAndNormalTexture;
     if (!mPrevFrameTextureIndex) {
+        pPrevFrameLinearZAndNormalTexture = renderData[kInternalBuffersLinearZAndNormal0]->asTexture();
+        pLinearZAndNormalTexture = renderData[kInternalBuffersLinearZAndNormal1]->asTexture();
         pPrevHistoryLengthTexture = renderData[kInternalBufferHistoryLength0]->asTexture();
         pHistoryLengthTexture = renderData[kInternalBufferHistoryLength1]->asTexture();
     }
     else {
+        pPrevFrameLinearZAndNormalTexture = renderData[kInternalBuffersLinearZAndNormal1]->asTexture();
+        pLinearZAndNormalTexture = renderData[kInternalBuffersLinearZAndNormal0]->asTexture();
         pPrevHistoryLengthTexture = renderData[kInternalBufferHistoryLength1]->asTexture();
         pHistoryLengthTexture = renderData[kInternalBufferHistoryLength0]->asTexture();
     }
@@ -253,7 +257,7 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
             auto perImageCB = mpPackLinearZAndNormal["PerImageCB"];
             perImageCB["gLinearZ"] = pLinearZTexture;
             perImageCB["gNormal"] = pWorldNormalTexture;
-
+            mpLinearZAndNormalFbo->attachColorTarget(pLinearZAndNormalTexture, 0);
             mpPackLinearZAndNormal->execute(pRenderContext, mpLinearZAndNormalFbo);
         }
 
@@ -261,8 +265,6 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
         // reprojected filtered illumination from the previous frame.
         // Stores the result as well as initial moments and an updated
         // per-pixel history length in mpReprojFbo.
-        Texture::SharedPtr pPrevLinearZAndNormalTexture =
-            renderData[kInternalBufferPreviousLinearZAndNormal]->asTexture();
         {
             auto perImageCB = mpReprojection["PerImageCB"];
 
@@ -273,8 +275,8 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
             perImageCB["gPositionNormalFwidth"] = pPosNormalFwidthTexture;
             perImageCB["gPrevIllum"] = pPrevFrameIllumTexture;
             perImageCB["gPrevHistoryLength"] = pPrevHistoryLengthTexture;
-            perImageCB["gLinearZAndNormal"] = mpLinearZAndNormalFbo->getColorTexture(0);
-            perImageCB["gPrevLinearZAndNormal"] = pPrevLinearZAndNormalTexture;
+            perImageCB["gLinearZAndNormal"] = pLinearZAndNormalTexture;
+            perImageCB["gPrevLinearZAndNormal"] = pPrevFrameLinearZAndNormalTexture;
 
             // Setup variables for our reprojection pass
             perImageCB["gMaxHistoryLength"] = mMaxHistoryLength;
@@ -291,7 +293,7 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
         // next time into mpFilteredPastFbo.
         {
             auto perImageCB = mpAtrous["PerImageCB"];
-            perImageCB["gLinearZAndNormal"] = mpLinearZAndNormalFbo->getColorTexture(0);
+            perImageCB["gLinearZAndNormal"] = pLinearZAndNormalTexture;
 
             perImageCB["gPhiColor"] = mPhiColor;
             perImageCB["gPhiNormal"] = mPhiNormal;
@@ -332,6 +334,7 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
         perImageCB["gIllumination"] = pPrevIterIllumTexture;
         perImageCB["gHistoryLength"] = pHistoryLengthTexture;
         perImageCB["gMaxHistoryLength"] = mMaxHistoryLength;
+        perImageCB["gLinearZAndNormal"] = pPrevFrameLinearZAndNormalTexture;
         mpFinalFbo->attachColorTarget(pOutputColorTexture, 0);
         mpFinalFbo->attachColorTarget(pOutputCoefficientOfVariationTexture, 1);
         mpFinalFbo->attachColorTarget(pOutputDebugView1Texture, 2);
@@ -341,8 +344,6 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
 
         // Swap resources so we're ready for next frame.
         mPrevFrameTextureIndex = !mPrevFrameTextureIndex;
-        pRenderContext->blit(mpLinearZAndNormalFbo->getColorTexture(0)->getSRV(),
-                             pPrevLinearZAndNormalTexture->getRTV());
     }
     else
     {
@@ -358,7 +359,8 @@ void SVGFIndividualPass::clearBuffers(RenderContext* pRenderContext, const Rende
     pRenderContext->clearFbo(mpAtrousFbo.get(), float4(0), 1.0f, 0, FboAttachmentType::All);
     pRenderContext->clearFbo(mpReprojFbo.get(), float4(0), 1.0f, 0, FboAttachmentType::All);
 
-    pRenderContext->clearTexture(renderData[kInternalBufferPreviousLinearZAndNormal]->asTexture().get());
+    pRenderContext->clearTexture(renderData[kInternalBuffersLinearZAndNormal0]->asTexture().get());
+    pRenderContext->clearTexture(renderData[kInternalBuffersLinearZAndNormal1]->asTexture().get());
     pRenderContext->clearTexture(renderData[kInternalBufferPreviousLighting]->asTexture().get());
     pRenderContext->clearTexture(renderData[kInternalBufferHistoryLength0]->asTexture().get());
     pRenderContext->clearTexture(renderData[kInternalBufferHistoryLength1]->asTexture().get());

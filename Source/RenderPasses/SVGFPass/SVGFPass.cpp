@@ -150,8 +150,6 @@ RenderPassReflection SVGFPass::reflect(const CompileData& compileData)
 
     reflector.addInput(kInputBufferAlbedo, "Albedo");
     reflector.addInput(kInputBufferColor, "Color");
-    reflector.addInput(kInputBufferEmission, "Emission");
-    reflector.addInput(kInputBufferWorldPosition, "World Position");
     reflector.addInput(kInputBufferWorldNormal, "World Normal");
     reflector.addInput(kInputBufferPosNormalFwidth, "PositionNormalFwidth");
     reflector.addInput(kInputBufferLinearZ, "LinearZ");

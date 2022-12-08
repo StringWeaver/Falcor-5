@@ -28,19 +28,21 @@
 import Scene.ShadingData;
 import SVGFCommon;
 import Utils.Color.ColorHelpers;
+import Utils.Math.MathHelpers; //temporary for showing normal
 
 cbuffer PerImageCB
 {
     Texture2D   gDiffuseReflectance;
     Texture2D   gIllumination;
     Texture2D   gHistoryLength;
+    Texture2D   gLinearZAndNormal;
     float gMaxHistoryLength;
     
 };
 struct PS_OUT{
     float3 outColor: SV_TARGET0;
-    float outCoefficientOfVariation : SV_TARGET1;
-    float outDbgView1 : SV_TARGET2;
+    float outValidSampleCount : SV_TARGET1;
+    float4 outDbgView1 : SV_TARGET2;
     float outDbgView2 : SV_TARGET3;
 }
 PS_OUT main(FullScreenPassVsOut vsOut) 
@@ -48,12 +50,11 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     PS_OUT psOut;
     const int2 ipos = int2(vsOut.posH.xy);
     float4 illumination = gIllumination[ipos];
-    float firstMoment = luminance(illumination.rgb);
-    float secondMoment = illumination.a;
-    float variance = secondMoment - firstMoment * firstMoment;
+    const float2 zCenter = gLinearZAndNormal[ipos].xy;
+    const float3 nCenter = oct_to_ndir_snorm(gLinearZAndNormal[ipos].zw);
     psOut.outColor = gDiffuseReflectance[ipos].rgb * gIllumination[ipos].rgb / gIllumination[ipos].a;
-    psOut.outCoefficientOfVariation = 0.01f * variance / (firstMoment + 1e-5);
-    psOut.outDbgView1 = gHistoryLength[ipos].r / gMaxHistoryLength;
-    psOut.outDbgView2 = 0.5f * variance;
+    psOut.outValidSampleCount = gIllumination[ipos].a / 100.f;
+    psOut.outDbgView1 = float4(nCenter,0.f);
+    psOut.outDbgView2 = zCenter.x / 10.f;
     return psOut;
 }
