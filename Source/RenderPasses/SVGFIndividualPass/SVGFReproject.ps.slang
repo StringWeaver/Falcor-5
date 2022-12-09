@@ -92,11 +92,11 @@ bool loadPrevData(float2 posH, out float4 prevIllum, out float historyLength)
     float3 normalPrev = oct_to_ndir_snorm(gPrevLinearZAndNormal[iposPrev].zw);
     if (isReprjValid(iposPrev, ZAndFwidthZ.x, prevZAndFwidthZ.x, ZAndFwidthZ.y, normal, normalPrev, normalFwidth)) {
         prevIllum = gPrevIllum[iposPrev];
-        historyLength = gPrevHistoryLength[iposPrev].x + 1.0f;
+        historyLength = gPrevHistoryLength[iposPrev].x;
         return true;
     } else {
         prevIllum = float4(0, 0, 0, 0);
-        historyLength = 1.0f;
+        historyLength = 0.0f;
         return false;
     }
 }
@@ -135,18 +135,16 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     float4 prevIllumination;
     bool success = loadPrevData(posH.xy, prevIllumination, historyLength);
     const float eps = 1e-6;
-    if (historyLength - gMaxHistoryLength > 1.f - eps) {
-        prevIllumination *= gMaxHistoryLength / historyLength;
-        historyLength = gMaxHistoryLength;
+    if (historyLength >  gMaxHistoryLength - eps) { // historyLength >=  gMaxHistoryLength
+        prevIllumination *= (gMaxHistoryLength - 1.f) / historyLength;
+        historyLength = gMaxHistoryLength - 1.f;
     }
-    const float spp = 1.f;
+
 
     // variance *= computeVarianceScale(16, 16, alpha);
-    illumination.a = 1.f; //temporary, shoud modify pathtracer to get real spp of current component
     PS_OUT psOut;
     // temporal integration of illumination
-    // 2nd moment is propagated through the alpha channel
     psOut.OutIllumination = prevIllumination + illumination;
-    psOut.OutHistoryLength = historyLength;
+    psOut.OutHistoryLength = historyLength + 1.f;
     return psOut;
 }
