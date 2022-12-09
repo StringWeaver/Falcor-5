@@ -261,30 +261,7 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
             mpPackLinearZAndNormal->execute(pRenderContext, mpLinearZAndNormalFbo);
         }
 
-        // Demodulate input color & albedo to get illumination and lerp in
-        // reprojected filtered illumination from the previous frame.
-        // Stores the result as well as initial moments and an updated
-        // per-pixel history length in mpReprojFbo.
-        {
-            auto perImageCB = mpReprojection["PerImageCB"];
 
-            // Setup textures for our reprojection shader pass
-            perImageCB["gMotion"] = pMotionVectorTexture;
-            perImageCB["gIllumination"] = pIlluminationTexture;
-            perImageCB["gDiffuseReflectance"] = pDiffuseReflectanceTexture;
-            perImageCB["gPositionNormalFwidth"] = pPosNormalFwidthTexture;
-            perImageCB["gPrevIllum"] = pPrevFrameIllumTexture;
-            perImageCB["gPrevHistoryLength"] = pPrevHistoryLengthTexture;
-            perImageCB["gLinearZAndNormal"] = pLinearZAndNormalTexture;
-            perImageCB["gPrevLinearZAndNormal"] = pPrevFrameLinearZAndNormalTexture;
-
-            // Setup variables for our reprojection pass
-            perImageCB["gMaxHistoryLength"] = mMaxHistoryLength;
-
-            mpReprojFbo->attachColorTarget(pPrevIterIllumTexture, 0);
-            mpReprojFbo->attachColorTarget(pHistoryLengthTexture, 1);
-            mpReprojection->execute(pRenderContext, mpReprojFbo);
-        }
         
 
         // Filter illumination from pPrevIterIllumTexture, storing the result
@@ -301,28 +278,51 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
             perImageCB["epsVariance"] = mVarainceEpsilon;
             perImageCB["epsMoment"] = mMomentEpsilon;
 
-            if (mFeedbackTap < 0 || mFilterIterations < 1)
-            {
-                pRenderContext->blit(pPrevIterIllumTexture->getSRV(), pPrevFrameIllumTexture->getRTV());
-            }
-            for (int i = 0; i < mFilterIterations; i++)
-            {
-
-                perImageCB["gIllumination"] = pPrevIterIllumTexture;
-                perImageCB["gStepSize"] = int(pow(3,i));
-                perImageCB["gIteration"] = i;
-                perImageCB["gFeedbackIteration"] = mFeedbackTap;
-                mpAtrousFbo->attachColorTarget(pCurrIterIllumTexture, 0);
-
-                mpAtrous->execute(pRenderContext, mpAtrousFbo);
-
-                // store the filtered color for the feedback path
-                if (i == std::min(mFeedbackTap, mFilterIterations - 1))
-                {
-                    pRenderContext->blit(pCurrIterIllumTexture->getSRV(), pPrevFrameIllumTexture->getRTV());
+            bool isPrevIterIllumTextureWritten = false;
+            for (int i = -1; i < mFilterIterations; i++)
+            {  
+                // Spatial Accumulation
+                if (i >= 0) {
+                    perImageCB["gIllumination"] = isPrevIterIllumTextureWritten ? pPrevIterIllumTexture : pIlluminationTexture;
+                    perImageCB["gStepSize"] = int(pow(3, i));
+                    perImageCB["gIteration"] = i;
+                    perImageCB["gSetSpp"] = !isPrevIterIllumTextureWritten;
+                    mpAtrousFbo->attachColorTarget(pCurrIterIllumTexture, 0);
+                    mpAtrous->execute(pRenderContext, mpAtrousFbo);
+                    isPrevIterIllumTextureWritten = true;
+                    std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
                 }
 
-                std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
+                // store the filtered color for the feedback path
+                // get illumination and lerp in
+                // reprojected filtered illumination from the previous frame.
+                // Stores the result as well as initial moments and an updated
+                // per-pixel history length in mpReprojFbo.
+                if (i == std::min(mFeedbackTap, mFilterIterations - 1))
+                {
+                    auto reprojPerImageCB = mpReprojection["PerImageCB"];
+
+                    // Setup textures for our reprojection shader pass
+                    reprojPerImageCB["gMotion"] = pMotionVectorTexture;
+                    reprojPerImageCB["gIllumination"] = isPrevIterIllumTextureWritten ? pPrevIterIllumTexture : pIlluminationTexture;
+                    reprojPerImageCB["gDiffuseReflectance"] = pDiffuseReflectanceTexture;
+                    reprojPerImageCB["gPositionNormalFwidth"] = pPosNormalFwidthTexture;
+                    reprojPerImageCB["gPrevIllum"] = pPrevFrameIllumTexture;
+                    reprojPerImageCB["gPrevHistoryLength"] = pPrevHistoryLengthTexture;
+                    reprojPerImageCB["gLinearZAndNormal"] = pLinearZAndNormalTexture;
+                    reprojPerImageCB["gPrevLinearZAndNormal"] = pPrevFrameLinearZAndNormalTexture;
+                    reprojPerImageCB["gSetSpp"] = !isPrevIterIllumTextureWritten;
+
+                    // Setup variables for our reprojection pass
+                    reprojPerImageCB["gMaxHistoryLength"] = mMaxHistoryLength;
+
+                    mpReprojFbo->attachColorTarget(pCurrIterIllumTexture, 0);
+                    mpReprojFbo->attachColorTarget(pHistoryLengthTexture, 1);
+                    mpReprojection->execute(pRenderContext, mpReprojFbo);
+                    isPrevIterIllumTextureWritten = true;
+                    pRenderContext->blit(pCurrIterIllumTexture->getSRV(), pPrevFrameIllumTexture->getRTV());
+                    std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
+                }
             }
 
             

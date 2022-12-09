@@ -42,7 +42,7 @@ cbuffer PerImageCB
     float epsVariance;
     float epsMoment;
     int gIteration;
-    int gFeedbackIteration;
+    bool gSetSpp;
 };
 
 // computes a 3x3 gaussian blur of the variance, centered around
@@ -79,6 +79,9 @@ float4 main(FullScreenPassVsOut vsOut)
 
     float phiLIllumination;
     float4 illuminationCenter = gIllumination.Load(int3(ipos, 0));
+    if (gSetSpp) {
+        illuminationCenter.a = 1.0f;
+    }
     // float validSampleCountCenter = gHistoryLength[ipos].x;
     const float illuminationLuminanceCenter = luminance(illuminationCenter.rgb / illuminationCenter.a);
 
@@ -116,6 +119,9 @@ float4 main(FullScreenPassVsOut vsOut)
                 const float kernel = kernelWeights[abs(xx)] * kernelWeights[abs(yy)];
 
                 const float4 illuminationP = gIllumination.Load(int3(p, 0));
+                if (gSetSpp) {
+                    illuminationP.a = 1.f;
+                }
                 const float illuminationLuminanceP = luminance(illuminationP.rgb / illuminationP.a);
                 const float zP = gLinearZAndNormal[p].x;
                 const float3 nP = oct_to_ndir_snorm(gLinearZAndNormal[p].zw);

@@ -48,7 +48,8 @@ cbuffer PerImageCB
     Texture2D   gPrevLinearZAndNormal;
     Texture2D   gPrevHistoryLength;
 
-    float       gMaxHistoryLength;
+    float gMaxHistoryLength;
+    bool gSetSpp;
 };
 
 float3 demodulate(float3 c, float3 albedo)
@@ -119,13 +120,18 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     const int2 ipos = posH.xy;
 
     float4 illumination = gIllumination[ipos];
+    float historyLength;
+    if (gSetSpp) {
+        illumination.a = 1;
+    }
     // Workaround path tracer bugs. TODO: remove this when we can.
     if (isNaN(illumination.x) || isNaN(illumination.y) || isNaN(illumination.z))
     {
         illumination = float4(0, 0, 0, 0);
+        historyLength = 0.f;
     }
 
-    float historyLength;
+    
     float4 prevIllumination;
     bool success = loadPrevData(posH.xy, prevIllumination, historyLength);
     const float eps = 1e-6;
