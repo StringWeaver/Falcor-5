@@ -33,15 +33,17 @@ int2 getTextureDims(Texture2D tex, uint mip)
 }
 
 float computeWeight(
+    int xx, int yy, float phiXY,
     float depthCenter, float depthP, float phiDepth,
     float3 normalCenter, float3 normalP, float phiNormal,
     float luminanceIllumCenter, float luminanceIllumP, float phiIllum)
 {
+    const float weightXY = float(xx * xx + yy * yy) /( 2 * phiXY * phiXY);
     const float weightNormal  = pow(saturate(dot(normalCenter, normalP)), phiNormal);
     const float weightZ       = (phiDepth == 0) ? 0.0f : abs(depthCenter - depthP) / phiDepth;
     const float weightLillum  = abs(luminanceIllumCenter - luminanceIllumP) / phiIllum;
 
-    const float weightIllum   = exp(0.0 - max(weightLillum, 0.0) - max(weightZ, 0.0)) * weightNormal;
+    const float weightIllum   = exp(- weightXY - 0.5 * weightZ * weightZ -0.5 * weightLillum * weightLillum )* weightNormal;
 
     return weightIllum;
 }

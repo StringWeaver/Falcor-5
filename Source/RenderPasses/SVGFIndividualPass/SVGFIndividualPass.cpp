@@ -51,6 +51,7 @@ namespace
     const char kFeedbackTap[] = "FeedbackTap";
     const char kVarianceEpsilon[] = "VarianceEpsilon";
     const char kCoefficientOfVariationEpsilon[] = "CoefficientOfVariationEpsilon";
+    const char kPhiXY[] = "PhiXY";
     const char kPhiColor[] = "PhiColor";
     const char kPhiNormal[] = "PhiNormal";
     const char kMaxHistoryLength[] = "MaxHistoryLength";
@@ -106,6 +107,7 @@ SVGFIndividualPass::SVGFIndividualPass(const Dictionary& dict)
         else if (key == kFeedbackTap) mFeedbackTap = value;
         else if (key == kVarianceEpsilon) mVarainceEpsilon = value;
         else if (key == kCoefficientOfVariationEpsilon) mMomentEpsilon = value;
+        else if (key == kPhiXY) mPhiXY = value;
         else if (key == kPhiColor) mPhiColor = value;
         else if (key == kPhiNormal) mPhiNormal = value;
         else if (key == kMaxHistoryLength) mMaxHistoryLength = value;
@@ -127,6 +129,7 @@ Dictionary SVGFIndividualPass::getScriptingDictionary()
     dict[kFeedbackTap] = mFeedbackTap;
     dict[kVarianceEpsilon] = mVarainceEpsilon;
     dict[kCoefficientOfVariationEpsilon] = mMomentEpsilon;
+    dict[kPhiXY] = mPhiXY;
     dict[kPhiColor] = mPhiColor;
     dict[kPhiNormal] = mPhiNormal;
     dict[kMaxHistoryLength] = mMaxHistoryLength;
@@ -271,7 +274,7 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
         {
             auto perImageCB = mpAtrous["PerImageCB"];
             perImageCB["gLinearZAndNormal"] = pLinearZAndNormalTexture;
-
+            perImageCB["gPhiXY"] = mPhiXY;
             perImageCB["gPhiColor"] = mPhiColor;
             perImageCB["gPhiNormal"] = mPhiNormal;
             perImageCB["gPhiDepth"] = mPhiDepth;
@@ -390,7 +393,8 @@ void SVGFIndividualPass::renderUI(Gui::Widgets& widget)
 
     widget.text("");
     widget.text("Contol edge stopping on bilateral fitler");
-    dirty |= (int)widget.var("For Color", mPhiColor, 0.0f, 10000.0f, 0.01f);
+    dirty |= (int)widget.var("For XY", mPhiXY, 0.5f, 1000.0f, 0.01f);
+    dirty |= (int)widget.var("For Color", mPhiColor, 0.01f, 10000.0f, 0.01f);
     dirty |= (int)widget.var("For Normal", mPhiNormal, 0.001f, 1000.0f, 0.2f);
     dirty |= (int)widget.var("For Depth", mPhiDepth, 0.001f, 30.0f);
 

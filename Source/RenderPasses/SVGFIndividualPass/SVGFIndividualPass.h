@@ -58,9 +58,10 @@ private:
     int32_t mFeedbackTap         = 1;
     float   mVarainceEpsilon     = 1e-8f;
     float   mMomentEpsilon     = 1e-3f;
+    float   mPhiXY = 20.0f;
     float   mPhiColor            = 10.0f;
     float   mPhiNormal           = 128.0f;
-    float   mPhiDepth            = 5.f;
+    float   mPhiDepth            = 20.f;
     float   mMaxHistoryLength               = 32.0f;
     bool mPrevFrameTextureIndex = 0;
 

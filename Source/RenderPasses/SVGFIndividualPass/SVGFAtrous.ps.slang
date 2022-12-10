@@ -36,6 +36,7 @@ cbuffer PerImageCB
     Texture2D gLinearZAndNormal;
 
     int gStepSize;
+    float gPhiXY;
     float gPhiColor;
     float gPhiNormal;
     float gPhiDepth;
@@ -116,7 +117,6 @@ float4 main(FullScreenPassVsOut vsOut)
 
             if (!samePixel && inside) // skip center pixel, it is already accumulated
             {
-                const float kernel = kernelWeights[abs(xx)] * kernelWeights[abs(yy)];
 
                 const float4 illuminationP = gIllumination.Load(int3(p, 0));
                 if (gSetSpp) {
@@ -127,12 +127,14 @@ float4 main(FullScreenPassVsOut vsOut)
                 const float3 nP = oct_to_ndir_snorm(gLinearZAndNormal[p].zw);
 
                 // compute the edge-stopping functions
-                const float2 w = computeWeight(
+                if (illuminationCenter.a < 10.f || illuminationP.a < 10.f) {
+                    phiLIllumination = 1e5;
+                }
+                const float wIllumination= computeWeight(
+                    xx * gStepSize, yy * gStepSize, gPhiXY,
                     zCenter.x, zP, phiDepth,
                     nCenter, nP, gPhiNormal,
                     illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
-
-                const float wIllumination = w.x * kernel;
 
                 sumWIllumination += wIllumination;
                 sumIllumination += wIllumination * illuminationP;
