@@ -56,15 +56,13 @@ private:
     bool    mFilterEnabled       = true;
     int32_t mFilterIterations    = 4;
     int32_t mFeedbackTap         = 1;
-    float   mVarainceEpsilon     = 1e-8f;
-    float   mMomentEpsilon     = 1e-3f;
     float   mPhiXY = 20.0f;
     float   mPhiColor            = 10.0f;
     float   mIgnorePhiColorSampleCountThreshold = 10.f;
     float   mPhiNormal           = 128.0f;
     float   mPhiDepth            = 1.f;
-    float   mMaxHistoryLength               = 32.0f;
-    bool mPrevFrameTextureIndex = 0;
+    float   mMaxHistoryLength    = 32.0f;
+    bool    mPrevFrameTextureIndex  = 0;
 
     // SSGAF passes
     FullScreenPass::SharedPtr mpPackLinearZAndNormal;

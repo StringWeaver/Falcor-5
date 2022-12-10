@@ -40,8 +40,6 @@ cbuffer PerImageCB
     float gPhiColor;
     float gPhiNormal;
     float gPhiDepth;
-    float epsVariance;
-    float epsMoment;
     float gIgnorePhiColorSampleCountThreshold;
     int gIteration;
     bool gSetSpp;
@@ -53,7 +51,7 @@ float4 main(FullScreenPassVsOut vsOut)
     const int2 ipos = int2(vsOut.posH.xy);
     const int2 screenSize = getTextureDims(gIllumination, 0);
 
-    float phiLIllumination;
+    
     float4 illuminationCenter = gIllumination.Load(int3(ipos, 0));
     if (gSetSpp) {
         illuminationCenter.a = 1.0f;
@@ -63,9 +61,6 @@ float4 main(FullScreenPassVsOut vsOut)
 
     // constant samplers to prevent the compiler from generating code which
     // fetches the sampler descriptor from memory for each texture access
-
-
-    phiLIllumination = gPhiColor;
 
     const float2 zCenter = gLinearZAndNormal[ipos].xy;
     if (zCenter.x < 0)
@@ -101,8 +96,11 @@ float4 main(FullScreenPassVsOut vsOut)
                 const float3 nP = oct_to_ndir_snorm(gLinearZAndNormal[p].zw);
 
                 // compute the edge-stopping functions
+                float phiLIllumination;
                 if (illuminationCenter.a < gIgnorePhiColorSampleCountThreshold || illuminationP.a < gIgnorePhiColorSampleCountThreshold) {
                     phiLIllumination = 1e5;
+                } else {
+                    phiLIllumination = gPhiColor;
                 }
                 const float wIllumination= computeWeight(
                     xx * gStepSize, yy * gStepSize, gPhiXY,

@@ -105,8 +105,6 @@ SSGAFPass::SSGAFPass(const Dictionary& dict)
         if (key == kEnabled) mFilterEnabled = value;
         else if (key == kIterations) mFilterIterations = value;
         else if (key == kFeedbackTap) mFeedbackTap = value;
-        else if (key == kVarianceEpsilon) mVarainceEpsilon = value;
-        else if (key == kCoefficientOfVariationEpsilon) mMomentEpsilon = value;
         else if (key == kPhiXY) mPhiXY = value;
         else if (key == kPhiDepth) mPhiDepth = value;
         else if (key == kPhiColor) mPhiColor = value;
@@ -129,8 +127,6 @@ Dictionary SSGAFPass::getScriptingDictionary()
     dict[kEnabled] = mFilterEnabled;
     dict[kIterations] = mFilterIterations;
     dict[kFeedbackTap] = mFeedbackTap;
-    dict[kVarianceEpsilon] = mVarainceEpsilon;
-    dict[kCoefficientOfVariationEpsilon] = mMomentEpsilon;
     dict[kPhiXY] = mPhiXY;
     dict[kPhiDepth] = mPhiDepth;
     dict[kPhiColor] = mPhiColor;
@@ -273,8 +269,6 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
             perImageCB["gPhiColor"] = mPhiColor;
             perImageCB["gPhiNormal"] = mPhiNormal;
             perImageCB["gPhiDepth"] = mPhiDepth;
-            perImageCB["epsVariance"] = mVarainceEpsilon;
-            perImageCB["epsMoment"] = mMomentEpsilon;
             perImageCB["gIgnorePhiColorSampleCountThreshold"] = mIgnorePhiColorSampleCountThreshold;
 
             bool isPrevIterIllumTextureWritten = false;
@@ -395,9 +389,6 @@ void SSGAFPass::renderUI(Gui::Widgets& widget)
     dirty |= (int)widget.var("For Normal", mPhiNormal, 0.001f, 1000.0f, 0.2f);
     dirty |= (int)widget.var("For Depth", mPhiDepth, 0.001f, 100.0f);
 
-    widget.text("Control epsilons");
-    dirty |= (int)widget.var("Eps Variance", mVarainceEpsilon, 1e-10f, 1.0f, 0.000000001f);
-    dirty |= (int)widget.var("Eps Moment(for compute Coefficient of Variation)", mMomentEpsilon, 1e-10f, 1.0f, 0.000000001f);
     
     widget.text("");
     widget.text("How much history should be used?");
