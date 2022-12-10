@@ -54,6 +54,7 @@ namespace
     const char kPhiXY[] = "PhiXY";
     const char kPhiDepth[] = "PhiDepth";
     const char kPhiColor[] = "PhiColor";
+    const char kIgnorePhiColorSampleCountThreshold[] = "IgnorePhiColorSampleCountThreshold";
     const char kPhiNormal[] = "PhiNormal";
     const char kMaxHistoryLength[] = "MaxHistoryLength";
 
@@ -109,6 +110,7 @@ SSGAFPass::SSGAFPass(const Dictionary& dict)
         else if (key == kPhiXY) mPhiXY = value;
         else if (key == kPhiDepth) mPhiDepth = value;
         else if (key == kPhiColor) mPhiColor = value;
+        else if (key == kIgnorePhiColorSampleCountThreshold) mIgnorePhiColorSampleCountThreshold = value;
         else if (key == kPhiNormal) mPhiNormal = value;
         else if (key == kMaxHistoryLength) mMaxHistoryLength = value;
         else logWarning("Unknown field '{}' in SSGAFPass dictionary.", key);
@@ -132,6 +134,7 @@ Dictionary SSGAFPass::getScriptingDictionary()
     dict[kPhiXY] = mPhiXY;
     dict[kPhiDepth] = mPhiDepth;
     dict[kPhiColor] = mPhiColor;
+    dict[kIgnorePhiColorSampleCountThreshold] = mIgnorePhiColorSampleCountThreshold;
     dict[kPhiNormal] = mPhiNormal;
     dict[kMaxHistoryLength] = mMaxHistoryLength;
     return dict;
@@ -272,6 +275,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
             perImageCB["gPhiDepth"] = mPhiDepth;
             perImageCB["epsVariance"] = mVarainceEpsilon;
             perImageCB["epsMoment"] = mMomentEpsilon;
+            perImageCB["gIgnorePhiColorSampleCountThreshold"] = mIgnorePhiColorSampleCountThreshold;
 
             bool isPrevIterIllumTextureWritten = false;
             for (int i = -1; i < mFilterIterations; i++)
@@ -387,6 +391,7 @@ void SSGAFPass::renderUI(Gui::Widgets& widget)
     widget.text("Contol edge stopping on bilateral fitler");
     dirty |= (int)widget.var("For XY", mPhiXY, 0.5f, 1000.0f, 0.01f);
     dirty |= (int)widget.var("For Color", mPhiColor, 0.01f, 10000.0f, 0.01f);
+    dirty |= (int)widget.var("Threshold sample count for PhiColor to take effect", mIgnorePhiColorSampleCountThreshold, 1.f, 1000.0f, 1.f);
     dirty |= (int)widget.var("For Normal", mPhiNormal, 0.001f, 1000.0f, 0.2f);
     dirty |= (int)widget.var("For Depth", mPhiDepth, 0.001f, 100.0f);
 

@@ -42,6 +42,7 @@ cbuffer PerImageCB
     float gPhiDepth;
     float epsVariance;
     float epsMoment;
+    float gIgnorePhiColorSampleCountThreshold;
     int gIteration;
     bool gSetSpp;
 };
@@ -51,7 +52,6 @@ float4 main(FullScreenPassVsOut vsOut)
 {
     const int2 ipos = int2(vsOut.posH.xy);
     const int2 screenSize = getTextureDims(gIllumination, 0);
-    const float kernelWeights[3] = { 1.0, 2.0 / 3.0, 1.0 / 6.0 };
 
     float phiLIllumination;
     float4 illuminationCenter = gIllumination.Load(int3(ipos, 0));
@@ -101,7 +101,7 @@ float4 main(FullScreenPassVsOut vsOut)
                 const float3 nP = oct_to_ndir_snorm(gLinearZAndNormal[p].zw);
 
                 // compute the edge-stopping functions
-                if (illuminationCenter.a < 10.f || illuminationP.a < 10.f) {
+                if (illuminationCenter.a < gIgnorePhiColorSampleCountThreshold || illuminationP.a < gIgnorePhiColorSampleCountThreshold) {
                     phiLIllumination = 1e5;
                 }
                 const float wIllumination= computeWeight(

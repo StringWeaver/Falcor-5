@@ -60,6 +60,7 @@ private:
     float   mMomentEpsilon     = 1e-3f;
     float   mPhiXY = 20.0f;
     float   mPhiColor            = 10.0f;
+    float   mIgnorePhiColorSampleCountThreshold = 10.f;
     float   mPhiNormal           = 128.0f;
     float   mPhiDepth            = 1.f;
     float   mMaxHistoryLength               = 32.0f;
