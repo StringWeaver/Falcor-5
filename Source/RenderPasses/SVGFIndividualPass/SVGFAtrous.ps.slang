@@ -142,8 +142,5 @@ float4 main(FullScreenPassVsOut vsOut)
         }
     }
 
-    // renormalization is different for variance, check paper for the formula
-    float4 filteredIllumination = sumIllumination / sumWIllumination;
-
-    return filteredIllumination;
+    return sumIllumination;
 }
