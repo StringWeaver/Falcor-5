@@ -40,7 +40,6 @@ bool isNaN(float f)
 cbuffer PerImageCB
 {
     Texture2D   gMotion;
-    Texture2D   gPositionNormalFwidth;
     Texture2D   gIllumination;
     Texture2D   gDiffuseReflectance;
     Texture2D   gPrevIllum;
@@ -49,6 +48,7 @@ cbuffer PerImageCB
     Texture2D   gPrevHistoryLength;
 
     float gMaxHistoryLength;
+    float gPhiDepth;
     bool gSetSpp;
 };
 
@@ -57,18 +57,17 @@ float3 demodulate(float3 c, float3 albedo)
     return c / max(albedo, float3(0.001, 0.001, 0.001));
 }
 
-bool isReprjValid(int2 coord, float Z, float Zprev, float fwidthZ, float3 normal, float3 normalPrev, float fwidthNormal)
+bool isReprjValid(int2 iposPrev,int2 ipos)
 {
     const int2 imageDim = getTextureDims(gIllumination, 0);
 
     // check whether reprojected pixel is inside of the screen
-    if (any(coord < int2(0,0)) || any(coord >= imageDim)) return false;
+    if (any(iposPrev < int2(0, 0)) || any(iposPrev >= imageDim)) return false;
 
+    float Z = gLinearZAndNormal[ipos].x;
+    float prevZ = gPrevLinearZAndNormal[iposPrev].x;
     // check if deviation of depths is acceptable
-    if (abs(Zprev - Z) / (fwidthZ + 1e-2f) > 10.f) return false;
-
-    // check normals for compatibility
-    if (distance(normal, normalPrev) / (fwidthNormal + 1e-2) > 16.0) return false;
+    if (abs(prevZ - Z) >  gPhiDepth*  3.0) return false;
 
     return true;
 }
@@ -79,18 +78,12 @@ bool loadPrevData(float2 posH, out float4 prevIllum, out float historyLength)
     const float2 imageDim = float2(getTextureDims(gIllumination, 0));
 
     const float2 motion = gMotion[ipos].xy;
-    const float normalFwidth = gPositionNormalFwidth[ipos].y;
 
      const float2 posPrev = posH.xy + motion.xy * imageDim;
      const int2 iposPrev = int2(posPrev);
 
-    float2 ZAndFwidthZ = gLinearZAndNormal[ipos].xy;
-    float3 normal = oct_to_ndir_snorm(gLinearZAndNormal[ipos].zw);
-
-
-    float2 prevZAndFwidthZ = gPrevLinearZAndNormal[iposPrev].xy;
-    float3 normalPrev = oct_to_ndir_snorm(gPrevLinearZAndNormal[iposPrev].zw);
-    if (isReprjValid(iposPrev, ZAndFwidthZ.x, prevZAndFwidthZ.x, ZAndFwidthZ.y, normal, normalPrev, normalFwidth)) {
+    
+    if (isReprjValid(iposPrev,ipos)) {
         prevIllum = gPrevIllum[iposPrev];
         historyLength = gPrevHistoryLength[iposPrev].x;
         return true;

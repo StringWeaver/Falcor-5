@@ -46,31 +46,6 @@ cbuffer PerImageCB
     bool gSetSpp;
 };
 
-// computes a 3x3 gaussian blur of the variance, centered around
-// the current pixel
-float computeVarianceCenter(int2 ipos)
-{
-    float sum = 0.f;
-
-    const float kernel[2][2] = {
-        { 1.0 / 4.0, 1.0 / 8.0 },
-        { 1.0 / 8.0, 1.0 / 16.0 }
-    };
-
-    const int radius = 1;
-    for (int yy = -radius; yy <= radius; yy++)
-    {
-        for (int xx = -radius; xx <= radius; xx++)
-        {
-            const int2 p = ipos + int2(xx, yy);
-            const float k = kernel[abs(xx)][abs(yy)];
-            sum += gIllumination.Load(int3(p, 0)).a * k;
-        }
-    }
-
-    return sum;
-}
-
 float4 main(FullScreenPassVsOut vsOut)
     : SV_TARGET0
 {
@@ -100,7 +75,6 @@ float4 main(FullScreenPassVsOut vsOut)
     }
     const float3 nCenter = oct_to_ndir_snorm(gLinearZAndNormal[ipos].zw);
 
-    const float phiDepth = max(zCenter.y, 1e-8) * gPhiDepth;
 
     // explicitly store/accumulate center pixel with weight 1 to prevent issues
     // with the edge-stopping functions
@@ -132,10 +106,9 @@ float4 main(FullScreenPassVsOut vsOut)
                 }
                 const float wIllumination= computeWeight(
                     xx * gStepSize, yy * gStepSize, gPhiXY,
-                    zCenter.x, zP, phiDepth,
+                    zCenter.x, zP, gPhiDepth,
                     nCenter, nP, gPhiNormal,
                     illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
-
                 sumWIllumination += wIllumination;
                 sumIllumination += wIllumination * illuminationP;
             }

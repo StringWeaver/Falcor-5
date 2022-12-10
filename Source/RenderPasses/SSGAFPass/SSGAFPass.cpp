@@ -52,6 +52,7 @@ namespace
     const char kVarianceEpsilon[] = "VarianceEpsilon";
     const char kCoefficientOfVariationEpsilon[] = "CoefficientOfVariationEpsilon";
     const char kPhiXY[] = "PhiXY";
+    const char kPhiDepth[] = "PhiDepth";
     const char kPhiColor[] = "PhiColor";
     const char kPhiNormal[] = "PhiNormal";
     const char kMaxHistoryLength[] = "MaxHistoryLength";
@@ -59,9 +60,7 @@ namespace
     // Input buffer names
     const char kInputBufferDiffuseReflectance[] = "DiffuseReflectance";
     const char kInputBufferIllumination[] = "Illumination";
-    const char kInputBufferWorldPosition[] = "WorldPosition";
     const char kInputBufferWorldNormal[] = "WorldNormal";
-    const char kInputBufferPosNormalFwidth[] = "PositionNormalFwidth";
     const char kInputBufferLinearZ[] = "LinearZ";
     const char kInputBufferMotionVector[] = "MotionVec";
 
@@ -108,6 +107,7 @@ SSGAFPass::SSGAFPass(const Dictionary& dict)
         else if (key == kVarianceEpsilon) mVarainceEpsilon = value;
         else if (key == kCoefficientOfVariationEpsilon) mMomentEpsilon = value;
         else if (key == kPhiXY) mPhiXY = value;
+        else if (key == kPhiDepth) mPhiDepth = value;
         else if (key == kPhiColor) mPhiColor = value;
         else if (key == kPhiNormal) mPhiNormal = value;
         else if (key == kMaxHistoryLength) mMaxHistoryLength = value;
@@ -130,6 +130,7 @@ Dictionary SSGAFPass::getScriptingDictionary()
     dict[kVarianceEpsilon] = mVarainceEpsilon;
     dict[kCoefficientOfVariationEpsilon] = mMomentEpsilon;
     dict[kPhiXY] = mPhiXY;
+    dict[kPhiDepth] = mPhiDepth;
     dict[kPhiColor] = mPhiColor;
     dict[kPhiNormal] = mPhiNormal;
     dict[kMaxHistoryLength] = mMaxHistoryLength;
@@ -154,9 +155,7 @@ RenderPassReflection SSGAFPass::reflect(const CompileData& compileData)
 
     reflector.addInput(kInputBufferDiffuseReflectance, "DiffuseReflectance");
     reflector.addInput(kInputBufferIllumination, "Radiance");
-    reflector.addInput(kInputBufferWorldPosition, "World Position");
     reflector.addInput(kInputBufferWorldNormal, "World Normal");
-    reflector.addInput(kInputBufferPosNormalFwidth, "PositionNormalFwidth");
     reflector.addInput(kInputBufferLinearZ, "LinearZ");
     reflector.addInput(kInputBufferMotionVector, "Motion vectors");
 
@@ -197,11 +196,6 @@ void SSGAFPass::compile(RenderContext* pRenderContext, const CompileData& compil
         Fbo::Desc desc;
         desc.setSampleCount(0);
         mpReprojFbo = Fbo::create2D(dim.x, dim.y, desc);
-    }
-
-    {
-        // Screen-size FBOs with no buffer
-        Fbo::Desc desc;
         mpLinearZAndNormalFbo = Fbo::create2D(dim.x, dim.y, desc);
         mpAtrousFbo = Fbo::create2D(dim.x, dim.y, desc);
         mpFinalFbo = Fbo::create2D(dim.x, dim.y, desc);
@@ -214,9 +208,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
 {
     Texture::SharedPtr pDiffuseReflectanceTexture = renderData[kInputBufferDiffuseReflectance]->asTexture();
     Texture::SharedPtr pIlluminationTexture = renderData[kInputBufferIllumination]->asTexture();
-    Texture::SharedPtr pWorldPositionTexture = renderData[kInputBufferWorldPosition]->asTexture();
     Texture::SharedPtr pWorldNormalTexture = renderData[kInputBufferWorldNormal]->asTexture();
-    Texture::SharedPtr pPosNormalFwidthTexture = renderData[kInputBufferPosNormalFwidth]->asTexture();
     Texture::SharedPtr pLinearZTexture = renderData[kInputBufferLinearZ]->asTexture();
     Texture::SharedPtr pMotionVectorTexture = renderData[kInputBufferMotionVector]->asTexture();
     Texture::SharedPtr pPrevFrameIllumTexture = renderData[kInternalBufferPreviousLighting]->asTexture();
@@ -309,12 +301,12 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                     reprojPerImageCB["gMotion"] = pMotionVectorTexture;
                     reprojPerImageCB["gIllumination"] = isPrevIterIllumTextureWritten ? pPrevIterIllumTexture : pIlluminationTexture;
                     reprojPerImageCB["gDiffuseReflectance"] = pDiffuseReflectanceTexture;
-                    reprojPerImageCB["gPositionNormalFwidth"] = pPosNormalFwidthTexture;
                     reprojPerImageCB["gPrevIllum"] = pPrevFrameIllumTexture;
                     reprojPerImageCB["gPrevHistoryLength"] = pPrevHistoryLengthTexture;
                     reprojPerImageCB["gLinearZAndNormal"] = pLinearZAndNormalTexture;
                     reprojPerImageCB["gPrevLinearZAndNormal"] = pPrevFrameLinearZAndNormalTexture;
                     reprojPerImageCB["gSetSpp"] = !isPrevIterIllumTextureWritten;
+                    reprojPerImageCB["gPhiDepth"] = mPhiDepth;
 
                     // Setup variables for our reprojection pass
                     reprojPerImageCB["gMaxHistoryLength"] = mMaxHistoryLength;
@@ -396,7 +388,7 @@ void SSGAFPass::renderUI(Gui::Widgets& widget)
     dirty |= (int)widget.var("For XY", mPhiXY, 0.5f, 1000.0f, 0.01f);
     dirty |= (int)widget.var("For Color", mPhiColor, 0.01f, 10000.0f, 0.01f);
     dirty |= (int)widget.var("For Normal", mPhiNormal, 0.001f, 1000.0f, 0.2f);
-    dirty |= (int)widget.var("For Depth", mPhiDepth, 0.001f, 30.0f);
+    dirty |= (int)widget.var("For Depth", mPhiDepth, 0.001f, 100.0f);
 
     widget.text("Control epsilons");
     dirty |= (int)widget.var("Eps Variance", mVarainceEpsilon, 1e-10f, 1.0f, 0.000000001f);

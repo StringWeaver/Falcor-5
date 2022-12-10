@@ -61,7 +61,7 @@ private:
     float   mPhiXY = 20.0f;
     float   mPhiColor            = 10.0f;
     float   mPhiNormal           = 128.0f;
-    float   mPhiDepth            = 20.f;
+    float   mPhiDepth            = 1.f;
     float   mMaxHistoryLength               = 32.0f;
     bool mPrevFrameTextureIndex = 0;
 
