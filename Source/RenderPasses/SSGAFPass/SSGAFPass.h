@@ -27,13 +27,12 @@
  **************************************************************************/
 #pragma once
 #include "Falcor.h"
-
 using namespace Falcor;
 
-class SVGFPass : public RenderPass
+class SSGAFPass : public RenderPass
 {
 public:
-    using SharedPtr = std::shared_ptr<SVGFPass>;
+    using SharedPtr = std::shared_ptr<SSGAFPass>;
 
     static const Info kInfo;
 
@@ -46,35 +45,27 @@ public:
     virtual void renderUI(Gui::Widgets& widget) override;
 
 private:
-    SVGFPass(const Dictionary& dict);
+    SSGAFPass(const Dictionary& dict);
 
     bool init(const Dictionary& dict);
-    void allocateFbos(uint2 dim, RenderContext* pRenderContext);
     void clearBuffers(RenderContext* pRenderContext, const RenderData& renderData);
-
-    void computeLinearZAndNormal(RenderContext* pRenderContext, Texture::SharedPtr pLinearZTexture,
-                                 Texture::SharedPtr pWorldNormalTexture);
-    void computeReprojection(RenderContext* pRenderContext, Texture::SharedPtr pAlbedoTexture,
-                             Texture::SharedPtr pColorTexture, Texture::SharedPtr pEmissionTexture,
-                             Texture::SharedPtr pMotionVectorTexture,
-                             Texture::SharedPtr pPositionNormalFwidthTexture,
-                             Texture::SharedPtr pPrevLinearZAndNormalTexture);
-    void computeFilteredMoments(RenderContext* pRenderContext);
-    void computeAtrousDecomposition(RenderContext* pRenderContext, Texture::SharedPtr pAlbedoTexture);
 
     bool mBuffersNeedClear = false;
 
-    // SVGF parameters
+    // SSGAF parameters
     bool    mFilterEnabled       = true;
     int32_t mFilterIterations    = 4;
     int32_t mFeedbackTap         = 1;
-    float   mVarainceEpsilon     = 1e-4f;
+    float   mVarainceEpsilon     = 1e-8f;
+    float   mMomentEpsilon     = 1e-3f;
+    float   mPhiXY = 20.0f;
     float   mPhiColor            = 10.0f;
     float   mPhiNormal           = 128.0f;
-    float   mAlpha               = 0.05f;
-    float   mMomentsAlpha        = 0.2f;
+    float   mPhiDepth            = 20.f;
+    float   mMaxHistoryLength               = 32.0f;
+    bool mPrevFrameTextureIndex = 0;
 
-    // SVGF passes
+    // SSGAF passes
     FullScreenPass::SharedPtr mpPackLinearZAndNormal;
     FullScreenPass::SharedPtr mpReprojection;
     FullScreenPass::SharedPtr mpFilterMoments;
@@ -82,11 +73,9 @@ private:
     FullScreenPass::SharedPtr mpFinalModulate;
 
     // Intermediate framebuffers
-    Fbo::SharedPtr mpPingPongFbo[2];
+    Fbo::SharedPtr mpAtrousFbo;
     Fbo::SharedPtr mpLinearZAndNormalFbo;
-    Fbo::SharedPtr mpFilteredPastFbo;
-    Fbo::SharedPtr mpCurReprojFbo;
-    Fbo::SharedPtr mpPrevReprojFbo;
+    Fbo::SharedPtr mpReprojFbo;
     Fbo::SharedPtr mpFilteredIlluminationFbo;
     Fbo::SharedPtr mpFinalFbo;
 };

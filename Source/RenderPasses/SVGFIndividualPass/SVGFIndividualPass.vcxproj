@@ -25,12 +25,6 @@
     <Import Project="..\..\Falcor\Falcor.props" />
   </ImportGroup>
   <ItemGroup>
-    <ClCompile Include="SVGFIndividualPass.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="SVGFIndividualPass.h" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\..\Falcor\Falcor.vcxproj">
       <Project>{2c535635-e4c5-4098-a928-574f0e7cd5f9}</Project>
     </ProjectReference>
@@ -38,9 +32,16 @@
   <ItemGroup>
     <ShaderSource Include="SVGFAtrous.ps.slang" />
     <ShaderSource Include="SVGFCommon.slang" />
+    <ShaderSource Include="SVGFFilterMoments.ps.slang" />
     <ShaderSource Include="SVGFFinalModulate.ps.slang" />
     <ShaderSource Include="SVGFPackLinearZAndNormal.ps.slang" />
     <ShaderSource Include="SVGFReproject.ps.slang" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="SVGFIndividualPass.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="SVGFIndividualPass.h" />
   </ItemGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>

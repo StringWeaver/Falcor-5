@@ -26,35 +26,21 @@
  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **************************************************************************/
 import Scene.ShadingData;
-import SVGFCommon;
+import Utils.Math.MathHelpers;
+import SSGAFCommon;
 
 cbuffer PerImageCB
 {
-    Texture2D   gAlbedo;
-    Texture2D   gEmission;
-    Texture2D   gIllumination;
-    Texture2D   gMoments;
-    Texture2D   gHistoryLength;
-    float       gAlpha;
+    Texture2D gLinearZ;
+    Texture2D gNormal;
 };
-struct PS_OUT{
-    float4 outColor: SV_TARGET0;
-    float outCoefficientOfVariation : SV_TARGET1;
-    float outDbgView1 : SV_TARGET2;
-    float outDbgView2 : SV_TARGET3;
-}
-inline float luminance(float3 rgb)
+
+float4 main(FullScreenPassVsOut vsOut) : SV_TARGET0
 {
-    return dot(rgb, float3(0.2126f, 0.7152f, 0.0722f));
+    float4 fragCoord = vsOut.posH;
+    const int2 ipos = int2(fragCoord.xy);
+
+    const float2 nPacked = ndir_to_oct_snorm(gNormal[ipos].xyz);
+    return float4(gLinearZ[ipos].xy, nPacked.x, nPacked.y);
 }
 
-PS_OUT main(FullScreenPassVsOut vsOut) : SV_TARGET0
-{
-    PS_OUT psOut;
-    const int2 ipos = int2(vsOut.posH.xy);
-    psOut.outColor = gAlbedo[ipos] * gIllumination[ipos] + gEmission[ipos];
-    psOut.outCoefficientOfVariation = 50.f * gIllumination[ipos].a / (1e-5 + gMoments[ipos].r);
-    psOut.outDbgView1 = gHistoryLength[ipos].r * gAlpha;
-    psOut.outDbgView2 = gMoments[ipos].r;
-    return psOut;
-}

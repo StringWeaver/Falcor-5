@@ -25,33 +25,36 @@
  # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **************************************************************************/
-int2 getTextureDims(Texture2D tex, uint mip)
+import Scene.ShadingData;
+import SSGAFCommon;
+import Utils.Color.ColorHelpers;
+import Utils.Math.MathHelpers; //temporary for showing normal
+
+cbuffer PerImageCB
 {
-    uint w, h;
-    tex.GetDimensions(w, h);
-    return int2(w,h);
-}
-
-float computeWeight(
-    float depthCenter, float depthP, float phiDepth,
-    float3 normalCenter, float3 normalP, float phiNormal,
-    float luminanceIllumCenter, float luminanceIllumP, float phiIllum)
-{
-    const float weightNormal  = pow(saturate(dot(normalCenter, normalP)), phiNormal);
-    const float weightZ       = (phiDepth == 0) ? 0.0f : abs(depthCenter - depthP) / phiDepth;
-    const float weightLillum  = abs(luminanceIllumCenter - luminanceIllumP) / phiIllum;
-
-    const float weightIllum   = exp(0.0 - max(weightLillum, 0.0) - max(weightZ, 0.0)) * weightNormal;
-
-    return weightIllum;
-}
-
-struct FullScreenPassVsOut
-{
-    float2 texC       : TEXCOORD;
-#ifndef _VIEWPORT_MASK
-    float4 posH       : SV_POSITION;
-#else
-    float4 posH       : POSITION;
-#endif
+    Texture2D   gDiffuseReflectance;
+    Texture2D   gIllumination;
+    Texture2D   gHistoryLength;
+    Texture2D   gLinearZAndNormal;
+    float gMaxHistoryLength;
+    
 };
+struct PS_OUT{
+    float3 outColor: SV_TARGET0;
+    float outValidSampleCount : SV_TARGET1;
+    float4 outDbgView1 : SV_TARGET2;
+    float outDbgView2 : SV_TARGET3;
+}
+PS_OUT main(FullScreenPassVsOut vsOut) 
+{
+    PS_OUT psOut;
+    const int2 ipos = int2(vsOut.posH.xy);
+    float4 illumination = gIllumination[ipos];
+    const float2 zCenter = gLinearZAndNormal[ipos].xy;
+    const float3 nCenter = oct_to_ndir_snorm(gLinearZAndNormal[ipos].zw);
+    psOut.outColor = gDiffuseReflectance[ipos].rgb * gIllumination[ipos].rgb / gIllumination[ipos].a;
+    psOut.outValidSampleCount = gIllumination[ipos].a / 100.f;
+    psOut.outDbgView1 = float4(nCenter,0.f);
+    psOut.outDbgView2 = zCenter.x / 10.f;
+    return psOut;
+}

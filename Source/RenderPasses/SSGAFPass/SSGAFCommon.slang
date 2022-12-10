@@ -25,22 +25,35 @@
  # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **************************************************************************/
-import Scene.ShadingData;
-import Utils.Math.MathHelpers;
-import SVGFCommon;
-
-cbuffer PerImageCB
+int2 getTextureDims(Texture2D tex, uint mip)
 {
-    Texture2D gLinearZ;
-    Texture2D gNormal;
-};
-
-float4 main(FullScreenPassVsOut vsOut) : SV_TARGET0
-{
-    float4 fragCoord = vsOut.posH;
-    const int2 ipos = int2(fragCoord.xy);
-
-    const float2 nPacked = ndir_to_oct_snorm(gNormal[ipos].xyz);
-    return float4(gLinearZ[ipos].xy, nPacked.x, nPacked.y);
+    uint w, h;
+    tex.GetDimensions(w, h);
+    return int2(w,h);
 }
 
+float computeWeight(
+    int xx, int yy, float phiXY,
+    float depthCenter, float depthP, float phiDepth,
+    float3 normalCenter, float3 normalP, float phiNormal,
+    float luminanceIllumCenter, float luminanceIllumP, float phiIllum)
+{
+    const float weightXY = float(xx * xx + yy * yy) /( 2 * phiXY * phiXY);
+    const float weightNormal  = pow(saturate(dot(normalCenter, normalP)), phiNormal);
+    const float weightZ       = (phiDepth == 0) ? 0.0f : abs(depthCenter - depthP) / phiDepth;
+    const float weightLillum  = abs(luminanceIllumCenter - luminanceIllumP) / phiIllum;
+
+    const float weightIllum   = exp(- weightXY - 0.5 * weightZ * weightZ -0.5 * weightLillum * weightLillum )* weightNormal;
+
+    return weightIllum;
+}
+
+struct FullScreenPassVsOut
+{
+    float2 texC       : TEXCOORD;
+#ifndef _VIEWPORT_MASK
+    float4 posH       : SV_POSITION;
+#else
+    float4 posH       : POSITION;
+#endif
+};
