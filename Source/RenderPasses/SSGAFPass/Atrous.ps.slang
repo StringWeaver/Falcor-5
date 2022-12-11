@@ -76,9 +76,9 @@ float4 main(FullScreenPassVsOut vsOut)
     float sumWIllumination = 1.0;
     float4 sumIllumination = illuminationCenter;
 
-    for (int yy = -1; yy <= 1; yy++)
+    for (int yy = -2; yy <= 2; yy++)
     {
-        for (int xx = -1; xx <= 1; xx++)
+        for (int xx = -2; xx <= 2; xx++)
         {
             const int2 p = ipos + int2(xx, yy) * gStepSize;
             const bool inside = all(p >= int2(0, 0)) && all(p < screenSize);

@@ -277,7 +277,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                 // Spatial Accumulation
                 if (i >= 0) {
                     perImageCB["gIllumination"] = isPrevIterIllumTextureWritten ? pPrevIterIllumTexture : pIlluminationTexture;
-                    perImageCB["gStepSize"] = int(pow(3, i));
+                    perImageCB["gStepSize"] = 1 << i;
                     perImageCB["gIteration"] = i;
                     perImageCB["gSetSpp"] = !isPrevIterIllumTextureWritten;
                     mpAtrousFbo->attachColorTarget(pCurrIterIllumTexture, 0);

@@ -53,7 +53,7 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     const float2 zCenter = gLinearZAndNormal[ipos].xy;
     const float3 nCenter = oct_to_ndir_snorm(gLinearZAndNormal[ipos].zw);
     psOut.outColor = gIllumination[ipos].rgb / gIllumination[ipos].a;
-    psOut.outValidSampleCount = gIllumination[ipos].a / 100.f;
+    psOut.outValidSampleCount = gIllumination[ipos].a / 50000.f;
     psOut.outDbgView1 = float4(nCenter,0.f);
     psOut.outDbgView2 = gHistoryLength[ipos].x/64.f;
     return psOut;
