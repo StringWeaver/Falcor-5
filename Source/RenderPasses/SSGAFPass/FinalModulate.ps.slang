@@ -40,10 +40,9 @@ cbuffer PerImageCB
     
 };
 struct PS_OUT{
-    float3 outColor: SV_TARGET0;
-    float outValidSampleCount : SV_TARGET1;
-    float4 outDbgView1 : SV_TARGET2;
-    float outDbgView2 : SV_TARGET3;
+    float outValidSampleCount : SV_TARGET0;
+    float4 outDbgView1 : SV_TARGET1;
+    float outDbgView2 : SV_TARGET2;
 }
 PS_OUT main(FullScreenPassVsOut vsOut) 
 {
@@ -52,7 +51,6 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     float4 illumination = gIllumination[ipos];
     const float2 zCenter = gLinearZAndNormal[ipos].xy;
     const float3 nCenter = oct_to_ndir_snorm(gLinearZAndNormal[ipos].zw);
-    psOut.outColor = gIllumination[ipos].rgb / gIllumination[ipos].a;
     psOut.outValidSampleCount = gIllumination[ipos].a / 50000.f;
     psOut.outDbgView1 = float4(nCenter,0.f);
     psOut.outDbgView2 = gHistoryLength[ipos].x/64.f;

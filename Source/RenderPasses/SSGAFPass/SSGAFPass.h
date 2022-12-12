@@ -57,8 +57,8 @@ private:
     int32_t mFilterIterations    = 4;
     int32_t mFeedbackTap         = 1;
     float   mPhiXY = 20.0f;
-    float   mPhiColor            = 10.0f;
-    float   mIgnorePhiColorSampleCountThreshold = 10.f;
+    float   mPhiColor            = 1.0f;
+    float   mIgnorePhiColorSampleCountThreshold = 25.f;
     float   mPhiNormal           = 128.0f;
     float   mPhiDepth            = 1.f;
     float   mMaxHistoryLength    = 32.0f;

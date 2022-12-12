@@ -49,13 +49,9 @@ cbuffer PerImageCB
 
     float gMaxHistoryLength;
     float gPhiDepth;
-    bool gSetSpp;
+    bool gIsFirstPass;
+    bool gIsLastPass;
 };
-
-float3 demodulate(float3 c, float3 albedo)
-{
-    return c / max(albedo, float3(0.001, 0.001, 0.001));
-}
 
 bool isReprjValid(int2 iposPrev,int2 ipos)
 {
@@ -105,6 +101,7 @@ struct PS_OUT
 {
     float4 OutIllumination : SV_TARGET0;
     float OutHistoryLength       : SV_TARGET1;
+    float4 OutColor :SV_TARGET2;
 };
 
 PS_OUT main(FullScreenPassVsOut vsOut)
@@ -114,7 +111,7 @@ PS_OUT main(FullScreenPassVsOut vsOut)
 
     float4 illumination = gIllumination[ipos];
     float historyLength;
-    if (gSetSpp) {
+    if (gIsFirstPass) {
         illumination.a = 1;
     }
     // Workaround path tracer bugs. TODO: remove this when we can.
@@ -137,7 +134,11 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     // variance *= computeVarianceScale(16, 16, alpha);
     PS_OUT psOut;
     // temporal integration of illumination
-    psOut.OutIllumination = prevIllumination + illumination;
+    float4 result = prevIllumination + illumination;
+    psOut.OutIllumination = result;
+    if (gIsLastPass) {
+        psOut.OutColor = float4(result.rgb / result.a, result.a);
+    } 
     psOut.OutHistoryLength = historyLength + 1.f;
     return psOut;
 }

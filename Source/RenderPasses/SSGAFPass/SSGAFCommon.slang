@@ -47,6 +47,10 @@ float computeWeight(
 
     return weightIllum;
 }
+float3 demodulate(float3 c, float3 albedo)
+{
+    return c / max(albedo, float3(0.001, 0.001, 0.001));
+}
 
 struct FullScreenPassVsOut
 {

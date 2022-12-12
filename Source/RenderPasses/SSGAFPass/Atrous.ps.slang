@@ -42,7 +42,8 @@ cbuffer PerImageCB
     float gPhiDepth;
     float gIgnorePhiColorSampleCountThreshold;
     int gIteration;
-    bool gSetSpp;
+    bool gIsFirstPass;
+    bool gIsLastPass;
 };
 
 float4 main(FullScreenPassVsOut vsOut)
@@ -53,7 +54,7 @@ float4 main(FullScreenPassVsOut vsOut)
 
     
     float4 illuminationCenter = gIllumination.Load(int3(ipos, 0));
-    if (gSetSpp) {
+    if (gIsFirstPass) {
         illuminationCenter.a = 1.0f;
     }
     // float validSampleCountCenter = gHistoryLength[ipos].x;
@@ -88,7 +89,7 @@ float4 main(FullScreenPassVsOut vsOut)
             {
 
                 const float4 illuminationP = gIllumination.Load(int3(p, 0));
-                if (gSetSpp) {
+                if (gIsFirstPass) {
                     illuminationP.a = 1.f;
                 }
                 const float illuminationLuminanceP = luminance(illuminationP.rgb / illuminationP.a);
@@ -112,6 +113,10 @@ float4 main(FullScreenPassVsOut vsOut)
             }
         }
     }
-
-    return sumIllumination;
+    if (gIsLastPass) {
+        return float4(sumIllumination.rgb / sumIllumination.a, sumIllumination.a);
+    } else {
+        return sumIllumination;
+    }
+    
 }

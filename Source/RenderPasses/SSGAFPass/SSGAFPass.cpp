@@ -271,18 +271,27 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
             perImageCB["gPhiDepth"] = mPhiDepth;
             perImageCB["gIgnorePhiColorSampleCountThreshold"] = mIgnorePhiColorSampleCountThreshold;
 
-            bool isPrevIterIllumTextureWritten = false;
+            bool isFirstPass = true;
             for (int i = -1; i < mFilterIterations; i++)
-            {  
+            {
+                bool isReprojectionIter = (i == std::min(mFeedbackTap, mFilterIterations - 1));
                 // Spatial Accumulation
                 if (i >= 0) {
-                    perImageCB["gIllumination"] = isPrevIterIllumTextureWritten ? pPrevIterIllumTexture : pIlluminationTexture;
+                    bool isLastPass = (i == mFilterIterations - 1) && !isReprojectionIter;
+                    perImageCB["gIllumination"] = isFirstPass ? pIlluminationTexture : pPrevIterIllumTexture;
                     perImageCB["gStepSize"] = 1 << i;
                     perImageCB["gIteration"] = i;
-                    perImageCB["gSetSpp"] = !isPrevIterIllumTextureWritten;
-                    mpAtrousFbo->attachColorTarget(pCurrIterIllumTexture, 0);
+                    perImageCB["gIsFirstPass"] = isFirstPass;
+                    perImageCB["gIsLastPass"] = isLastPass;
+                    if (isLastPass) {
+                        mpAtrousFbo->attachColorTarget(pOutputColorTexture, 0);
+                    }
+                    else {
+                        mpAtrousFbo->attachColorTarget(pCurrIterIllumTexture, 0);
+                    }
+                    
                     mpAtrous->execute(pRenderContext, mpAtrousFbo);
-                    isPrevIterIllumTextureWritten = true;
+                    isFirstPass = false;
                     std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
                 }
 
@@ -291,28 +300,33 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                 // reprojected filtered illumination from the previous frame.
                 // Stores the result as well as initial moments and an updated
                 // per-pixel history length in mpReprojFbo.
-                if (i == std::min(mFeedbackTap, mFilterIterations - 1))
+                if (isReprojectionIter)
                 {
-                    auto reprojPerImageCB = mpReprojection["PerImageCB"];
 
+                    bool isLastPass = (i == mFilterIterations - 1);
+
+                    auto reprojPerImageCB = mpReprojection["PerImageCB"];
                     // Setup textures for our reprojection shader pass
                     reprojPerImageCB["gMotion"] = pMotionVectorTexture;
-                    reprojPerImageCB["gIllumination"] = isPrevIterIllumTextureWritten ? pPrevIterIllumTexture : pIlluminationTexture;
+                    reprojPerImageCB["gIllumination"] = isFirstPass ? pIlluminationTexture : pPrevIterIllumTexture;
                     reprojPerImageCB["gDiffuseReflectance"] = pDiffuseReflectanceTexture;
                     reprojPerImageCB["gPrevIllum"] = pPrevFrameIllumTexture;
                     reprojPerImageCB["gPrevHistoryLength"] = pPrevHistoryLengthTexture;
                     reprojPerImageCB["gLinearZAndNormal"] = pLinearZAndNormalTexture;
                     reprojPerImageCB["gPrevLinearZAndNormal"] = pPrevFrameLinearZAndNormalTexture;
-                    reprojPerImageCB["gSetSpp"] = !isPrevIterIllumTextureWritten;
-                    reprojPerImageCB["gPhiDepth"] = mPhiDepth;
-
                     // Setup variables for our reprojection pass
                     reprojPerImageCB["gMaxHistoryLength"] = mMaxHistoryLength;
+                    reprojPerImageCB["gIsLastPass"] = isLastPass;
+                    reprojPerImageCB["gIsFirstPass"] = isFirstPass;
+                    reprojPerImageCB["gPhiDepth"] = mPhiDepth;
 
+                    isFirstPass = false;
                     mpReprojFbo->attachColorTarget(pCurrIterIllumTexture, 0);
                     mpReprojFbo->attachColorTarget(pHistoryLengthTexture, 1);
+                    if (isLastPass) {
+                        mpReprojFbo->attachColorTarget(pOutputColorTexture, 2); 
+                    }
                     mpReprojection->execute(pRenderContext, mpReprojFbo);
-                    isPrevIterIllumTextureWritten = true;
                     pRenderContext->blit(pCurrIterIllumTexture->getSRV(), pPrevFrameIllumTexture->getRTV());
                     std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
                 }
@@ -328,10 +342,9 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
         perImageCB["gHistoryLength"] = pHistoryLengthTexture;
         perImageCB["gMaxHistoryLength"] = mMaxHistoryLength;
         perImageCB["gLinearZAndNormal"] = pPrevFrameLinearZAndNormalTexture;
-        mpFinalFbo->attachColorTarget(pOutputColorTexture, 0);
-        mpFinalFbo->attachColorTarget(pOutputCoefficientOfVariationTexture, 1);
-        mpFinalFbo->attachColorTarget(pOutputDebugView1Texture, 2);
-        mpFinalFbo->attachColorTarget(pOutputDebugView2Texture, 3);
+        mpFinalFbo->attachColorTarget(pOutputCoefficientOfVariationTexture, 0);
+        mpFinalFbo->attachColorTarget(pOutputDebugView1Texture, 1);
+        mpFinalFbo->attachColorTarget(pOutputDebugView2Texture, 2);
         mpFinalModulate->execute(pRenderContext, mpFinalFbo);
 
 
