@@ -54,8 +54,9 @@ private:
 
     // SSGAF parameters
     bool    mFilterEnabled       = true;
-    int32_t mFilterIterations    = 4;
+    int32_t mFilterIterations    = 2;
     int32_t mFeedbackTap         = 1;
+    int32_t mPatternSequenceIndex = 0;
     float   mPhiXY = 20.0f;
     float   mPhiColor            = 1.0f;
     float   mIgnorePhiColorSampleCountThreshold = 25.f;

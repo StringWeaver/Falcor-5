@@ -239,6 +239,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
         // the value of mFeedbackTap), save the filtered illumination for
         // next time into mpFilteredPastFbo.
         {
+            const std::array<const int2,4> patternSequence = {int2(1,0), int2(1,1), int2(0,1), int2(-1,1)};
             auto perImageCB = mpAtrous["PerImageCB"];
             perImageCB["gLinearZ"] = pLinearZTexture;
             perImageCB["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
@@ -249,27 +250,32 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
             perImageCB["gIgnorePhiColorSampleCountThreshold"] = mIgnorePhiColorSampleCountThreshold;
 
             bool isFirstPass = true;
+            mPatternSequenceIndex = (mPatternSequenceIndex + 1) % patternSequence.size();
+            int2 pattern = patternSequence[mPatternSequenceIndex];
             for (int i = -1; i < mFilterIterations; i++)
             {
-                bool isReprojectionIter = (i == std::min(mFeedbackTap, mFilterIterations - 1));
+                bool isReprojectionIter = (i == std::min(mFeedbackTap - 1, mFilterIterations - 1));
                 // Spatial Accumulation
                 if (i >= 0) {
-                    bool isLastPass = (i == mFilterIterations - 1) && !isReprojectionIter;
-                    perImageCB["gIllumination"] = isFirstPass ? pIlluminationTexture : pPrevIterIllumTexture;
-                    perImageCB["gStepSize"] = 1 << i;
-                    perImageCB["gIteration"] = i;
-                    perImageCB["gIsFirstPass"] = isFirstPass;
-                    perImageCB["gIsLastPass"] = isLastPass;
-                    if (isLastPass) {
-                        mpAtrousFbo->attachColorTarget(pOutputColorTexture, 0);
+                    for (int j = 0; j < 2; j++) {
+                        bool isLastPass = (i == mFilterIterations - 1) && !isReprojectionIter && j == 1;
+                        perImageCB["gIllumination"] = isFirstPass ? pIlluminationTexture : pPrevIterIllumTexture;
+                        perImageCB["gPattern"] = pattern << i;
+                        pattern = int2(pattern.y, -pattern.x); //rotate pattern for 90 degrees, prepare for next iteration
+                        perImageCB["gIteration"] = i;
+                        perImageCB["gIsFirstPass"] = isFirstPass;
+                        perImageCB["gIsLastPass"] = isLastPass;
+                        if (isLastPass) {
+                            mpAtrousFbo->attachColorTarget(pOutputColorTexture, 0);
+                        }
+                        else {
+                            mpAtrousFbo->attachColorTarget(pCurrIterIllumTexture, 0);
+                        }
+
+                        mpAtrous->execute(pRenderContext, mpAtrousFbo);
+                        isFirstPass = false;
+                        std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
                     }
-                    else {
-                        mpAtrousFbo->attachColorTarget(pCurrIterIllumTexture, 0);
-                    }
-                    
-                    mpAtrous->execute(pRenderContext, mpAtrousFbo);
-                    isFirstPass = false;
-                    std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
                 }
 
                 // store the filtered color for the feedback path
@@ -370,7 +376,7 @@ void SSGAFPass::renderUI(Gui::Widgets& widget)
     widget.text("Number of filter iterations.  Which");
     widget.text("    iteration feeds into future frames?");
     dirty |= (int)widget.var("Iterations", mFilterIterations, 0, 10, 1);
-    dirty |= (int)widget.var("Feedback Iteration Index", mFeedbackTap, -1, mFilterIterations - 1, 1);
+    dirty |= (int)widget.var("Feedback Iteration", mFeedbackTap, 0, mFilterIterations, 1);
 
     widget.text("");
     widget.text("Contol edge stopping on bilateral fitler");

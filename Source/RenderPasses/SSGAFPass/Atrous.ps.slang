@@ -36,7 +36,7 @@ cbuffer PerImageCB
     Texture2D gLinearZ;
     Texture2D gNormalRoughnessMaterialID;
 
-    int gStepSize;
+    int2 gPattern;
     float gPhiXY;
     float gPhiColor;
     float gPhiNormal;
@@ -77,18 +77,15 @@ float4 main(FullScreenPassVsOut vsOut)
     // with the edge-stopping functions
     float sumWIllumination = 1.0;
     float4 sumIllumination = illuminationCenter;
-
-    for (int yy = -2; yy <= 2; yy++)
+    int2 dxdy = gPattern;
+    for (int step = 1; step <= 2; step++)
     {
-        for (int xx = -2; xx <= 2; xx++)
+        for (int i = 0; i < 2 ; i++)
         {
-            const int2 p = ipos + int2(xx, yy) * gStepSize;
+            const int2 p = ipos +  dxdy;
             const bool inside = all(p >= int2(0, 0)) && all(p < screenSize);
-            const bool samePixel = (xx == 0 && yy == 0);
-
-            if (!samePixel && inside) // skip center pixel, it is already accumulated
+            if (inside) // skip center pixel, it is already accumulated
             {
-
                 const float4 illuminationP = gIllumination.Load(int3(p, 0));
                 if (gIsFirstPass) {
                     illuminationP.a = 1.f;
@@ -105,14 +102,16 @@ float4 main(FullScreenPassVsOut vsOut)
                     phiLIllumination = gPhiColor;
                 }
                 const float wIllumination= computeWeight(
-                    xx * gStepSize, yy * gStepSize, gPhiXY,
+                    dxdy.x, dxdy.y, gPhiXY,
                     zCenter, zP, gPhiDepth,
                     nCenter, nP, gPhiNormal,
                     illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
                 sumWIllumination += wIllumination;
                 sumIllumination += wIllumination * illuminationP;
             }
+            dxdy = -dxdy;
         }
+        dxdy += gPattern;
     }
     if (gIsLastPass) {
         return float4(sumIllumination.rgb / sumIllumination.a, sumIllumination.a);
