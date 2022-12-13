@@ -33,7 +33,8 @@ import SSGAFCommon;
 cbuffer PerImageCB
 {
     Texture2D gIllumination;
-    Texture2D gLinearZAndNormal;
+    Texture2D gLinearZ;
+    Texture2D gNormalRoughnessMaterialID;
 
     int gStepSize;
     float gPhiXY;
@@ -63,13 +64,13 @@ float4 main(FullScreenPassVsOut vsOut)
     // constant samplers to prevent the compiler from generating code which
     // fetches the sampler descriptor from memory for each texture access
 
-    const float2 zCenter = gLinearZAndNormal[ipos].xy;
-    if (zCenter.x < 0)
+    const float zCenter = gLinearZ[ipos].x;
+    if (zCenter < 0)
     {
         // not a valid depth => must be envmap => do not filter
         return illuminationCenter;
     }
-    const float3 nCenter = oct_to_ndir_snorm(gLinearZAndNormal[ipos].zw);
+    const float3 nCenter = oct_to_ndir_unorm(gNormalRoughnessMaterialID[ipos].xy);
 
 
     // explicitly store/accumulate center pixel with weight 1 to prevent issues
@@ -93,8 +94,8 @@ float4 main(FullScreenPassVsOut vsOut)
                     illuminationP.a = 1.f;
                 }
                 const float illuminationLuminanceP = luminance(illuminationP.rgb / illuminationP.a);
-                const float zP = gLinearZAndNormal[p].x;
-                const float3 nP = oct_to_ndir_snorm(gLinearZAndNormal[p].zw);
+                const float zP = gLinearZ[p].x;
+                const float3 nP = oct_to_ndir_unorm(gNormalRoughnessMaterialID[p].xy);
 
                 // compute the edge-stopping functions
                 float phiLIllumination;
@@ -105,7 +106,7 @@ float4 main(FullScreenPassVsOut vsOut)
                 }
                 const float wIllumination= computeWeight(
                     xx * gStepSize, yy * gStepSize, gPhiXY,
-                    zCenter.x, zP, gPhiDepth,
+                    zCenter, zP, gPhiDepth,
                     nCenter, nP, gPhiNormal,
                     illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
                 sumWIllumination += wIllumination;

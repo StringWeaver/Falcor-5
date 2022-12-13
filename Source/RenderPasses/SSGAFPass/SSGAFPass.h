@@ -65,7 +65,6 @@ private:
     bool    mPrevFrameTextureIndex  = 0;
 
     // SSGAF passes
-    FullScreenPass::SharedPtr mpPackLinearZAndNormal;
     FullScreenPass::SharedPtr mpReprojection;
     FullScreenPass::SharedPtr mpFilterMoments;
     FullScreenPass::SharedPtr mpAtrous;
@@ -73,7 +72,6 @@ private:
 
     // Intermediate framebuffers
     Fbo::SharedPtr mpAtrousFbo;
-    Fbo::SharedPtr mpLinearZAndNormalFbo;
     Fbo::SharedPtr mpReprojFbo;
     Fbo::SharedPtr mpFilteredIlluminationFbo;
     Fbo::SharedPtr mpFinalFbo;

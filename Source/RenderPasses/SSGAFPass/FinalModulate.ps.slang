@@ -34,8 +34,9 @@ cbuffer PerImageCB
 {
     Texture2D   gDiffuseReflectance;
     Texture2D   gIllumination;
-    Texture2D   gHistoryLength;
-    Texture2D   gLinearZAndNormal;
+    Texture2D gHistoryLength;
+    Texture2D gLinearZ;
+    Texture2D gNormalRoughnessMaterialID;
     float gMaxHistoryLength;
     
 };
@@ -49,9 +50,9 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     PS_OUT psOut;
     const int2 ipos = int2(vsOut.posH.xy);
     float4 illumination = gIllumination[ipos];
-    const float2 zCenter = gLinearZAndNormal[ipos].xy;
-    const float3 nCenter = oct_to_ndir_snorm(gLinearZAndNormal[ipos].zw);
-    psOut.outValidSampleCount = gIllumination[ipos].a / 50000.f;
+    const float zCenter = gLinearZ[ipos].x;
+    const float3 nCenter = oct_to_ndir_unorm(gNormalRoughnessMaterialID[ipos].xy);
+    psOut.outValidSampleCount = zCenter / 50.f;
     psOut.outDbgView1 = float4(nCenter,0.f);
     psOut.outDbgView2 = gHistoryLength[ipos].x/64.f;
     return psOut;

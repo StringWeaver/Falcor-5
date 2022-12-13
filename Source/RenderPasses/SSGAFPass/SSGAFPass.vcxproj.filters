@@ -9,7 +9,6 @@
   <ItemGroup>
     <ShaderSource Include="Atrous.ps.slang" />
     <ShaderSource Include="FinalModulate.ps.slang" />
-    <ShaderSource Include="PackLinearZAndNormal.ps.slang" />
     <ShaderSource Include="Reproject.ps.slang" />
     <ShaderSource Include="SSGAFCommon.slang" />
   </ItemGroup>

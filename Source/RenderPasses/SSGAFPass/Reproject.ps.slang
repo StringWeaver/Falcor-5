@@ -42,9 +42,10 @@ cbuffer PerImageCB
     Texture2D   gMotion;
     Texture2D   gIllumination;
     Texture2D   gDiffuseReflectance;
-    Texture2D   gPrevIllum;
-    Texture2D   gLinearZAndNormal;
-    Texture2D   gPrevLinearZAndNormal;
+    Texture2D gPrevIllum;
+    Texture2D gLinearZ;
+    Texture2D gPrevLinearZ;
+    Texture2D gNormalRoughnessMaterialID;
     Texture2D   gPrevHistoryLength;
 
     float gMaxHistoryLength;
@@ -60,8 +61,8 @@ bool isReprjValid(int2 iposPrev,int2 ipos)
     // check whether reprojected pixel is inside of the screen
     if (any(iposPrev < int2(0, 0)) || any(iposPrev >= imageDim)) return false;
 
-    float Z = gLinearZAndNormal[ipos].x;
-    float prevZ = gPrevLinearZAndNormal[iposPrev].x;
+    float Z = gLinearZ[ipos].x;
+    float prevZ = gPrevLinearZ[iposPrev].x;
     // check if deviation of depths is acceptable
     if (abs(prevZ - Z) >  gPhiDepth*  3.0) return false;
 
