@@ -239,7 +239,6 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
         // the value of mFeedbackTap), save the filtered illumination for
         // next time into mpFilteredPastFbo.
         {
-            const std::array<const int2,4> patternSequence = {int2(1,0), int2(1,1), int2(0,1), int2(-1,1)};
             auto perImageCB = mpAtrous["PerImageCB"];
             perImageCB["gLinearZ"] = pLinearZTexture;
             perImageCB["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
@@ -250,8 +249,9 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
             perImageCB["gIgnorePhiColorSampleCountThreshold"] = mIgnorePhiColorSampleCountThreshold;
 
             bool isFirstPass = true;
-            mPatternSequenceIndex = (mPatternSequenceIndex + 1) % patternSequence.size();
-            int2 pattern = patternSequence[mPatternSequenceIndex];
+            //const std::array<const int2, 4> patternSequence = { int2(0,1), int2(1,1), int2(0,1), int2(-1,1) };
+            //mPatternSequenceIndex = (mPatternSequenceIndex + 1) % patternSequence.size();
+            int2 pattern = int2(0, 1);
             for (int i = -1; i < mFilterIterations; i++)
             {
                 bool isReprojectionIter = (i == std::min(mFeedbackTap - 1, mFilterIterations - 1));
@@ -261,7 +261,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                         bool isLastPass = (i == mFilterIterations - 1) && !isReprojectionIter && j == 1;
                         perImageCB["gIllumination"] = isFirstPass ? pIlluminationTexture : pPrevIterIllumTexture;
                         perImageCB["gPattern"] = pattern << i;
-                        pattern = int2(pattern.y, -pattern.x); //rotate pattern for 90 degrees, prepare for next iteration
+                        pattern = int2(1, 0); 
                         perImageCB["gIteration"] = i;
                         perImageCB["gIsFirstPass"] = isFirstPass;
                         perImageCB["gIsLastPass"] = isLastPass;

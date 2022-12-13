@@ -78,7 +78,7 @@ float4 main(FullScreenPassVsOut vsOut)
     float sumWIllumination = 1.0;
     float4 sumIllumination = illuminationCenter;
     int2 dxdy = gPattern;
-    for (int step = 1; step <= 2; step++)
+    for (int step = 1; step <= 50; step++)
     {
         for (int i = 0; i < 2 ; i++)
         {
