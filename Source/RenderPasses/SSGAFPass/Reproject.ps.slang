@@ -125,7 +125,7 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     bool success = loadPrevData(posH.xy, prevIllumination, historyLength);
     const float eps = 1e-6;
     if (historyLength >  gMaxHistoryLength - eps) { // historyLength >=  gMaxHistoryLength
-        prevIllumination *= (gMaxHistoryLength - 1.f) / historyLength;
+        prevIllumination.a *= (gMaxHistoryLength - 1.f) / historyLength;
         historyLength = gMaxHistoryLength - 1.f;
     }
 
@@ -133,7 +133,10 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     // variance *= computeVarianceScale(16, 16, alpha);
     PS_OUT psOut;
     // temporal integration of illumination
-    psOut.OutIllumination = prevIllumination + illumination;
+    float weightHistory = historyLength;
+    float weightCurrent = 1.f; 
+    float sumWeight = weightHistory + weightCurrent;
+    psOut.OutIllumination =  (weightHistory * prevIllumination + weightCurrent * illumination) / sumWeight ;
     psOut.OutHistoryLength = historyLength + 1.f;
     return psOut;
 }

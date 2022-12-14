@@ -58,7 +58,7 @@ float4 main(FullScreenPassVsOut vsOut)
         illuminationCenter.a = 1.0f;
     }
     // float validSampleCountCenter = gHistoryLength[ipos].x;
-    const float illuminationLuminanceCenter = luminance(illuminationCenter.rgb / illuminationCenter.a);
+    const float illuminationLuminanceCenter = luminance(illuminationCenter.rgb);
 
     // constant samplers to prevent the compiler from generating code which
     // fetches the sampler descriptor from memory for each texture access
@@ -89,7 +89,7 @@ float4 main(FullScreenPassVsOut vsOut)
                 if (gIsFirstPass) {
                     illuminationP.a = 1.f;
                 }
-                const float illuminationLuminanceP = luminance(illuminationP.rgb / illuminationP.a);
+                const float illuminationLuminanceP = luminance(illuminationP.rgb);
                 const float zP = gLinearZ[p].x;
                 const float3 nP = oct_to_ndir_unorm(gNormalRoughnessMaterialID[p].xy);
 
@@ -113,7 +113,7 @@ float4 main(FullScreenPassVsOut vsOut)
         dxdy += gPattern;
     }
 
-    return sumIllumination;
+    return float4(sumIllumination.rgb / sumWIllumination, sumIllumination.a);
 
     
 }
