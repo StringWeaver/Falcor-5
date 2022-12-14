@@ -321,7 +321,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                     }
 
                     else {
-                        pRenderContext->blit(pCurrIterIllumTexture->getSRV(), pPrevFrameIllumTexture->getRTV());
+                        pRenderContext->blit(pPrevIterIllumTexture->getSRV(), pPrevFrameIllumTexture->getRTV());
                     }
                 }
             }
