@@ -51,7 +51,6 @@ cbuffer PerImageCB
     float gMaxHistoryLength;
     float gPhiDepth;
     bool gIsFirstPass;
-    bool gIsLastPass;
 };
 
 bool isReprjValid(int2 iposPrev,int2 ipos)
@@ -102,7 +101,6 @@ struct PS_OUT
 {
     float4 OutIllumination : SV_TARGET0;
     float OutHistoryLength       : SV_TARGET1;
-    float4 OutColor :SV_TARGET2;
 };
 
 PS_OUT main(FullScreenPassVsOut vsOut)
@@ -135,11 +133,7 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     // variance *= computeVarianceScale(16, 16, alpha);
     PS_OUT psOut;
     // temporal integration of illumination
-    float4 result = prevIllumination + illumination;
-    psOut.OutIllumination = result;
-    if (gIsLastPass) {
-        psOut.OutColor = float4(result.rgb / result.a, result.a);
-    } 
+    psOut.OutIllumination = prevIllumination + illumination;
     psOut.OutHistoryLength = historyLength + 1.f;
     return psOut;
 }

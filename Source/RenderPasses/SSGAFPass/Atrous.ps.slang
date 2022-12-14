@@ -44,7 +44,6 @@ cbuffer PerImageCB
     float gIgnorePhiColorSampleCountThreshold;
     int gIteration;
     bool gIsFirstPass;
-    bool gIsLastPass;
 };
 
 float4 main(FullScreenPassVsOut vsOut)
@@ -113,10 +112,8 @@ float4 main(FullScreenPassVsOut vsOut)
         }
         dxdy += gPattern;
     }
-    if (gIsLastPass) {
-        return float4(sumIllumination.rgb / sumIllumination.a, sumIllumination.a);
-    } else {
-        return sumIllumination;
-    }
+
+    return sumIllumination;
+
     
 }

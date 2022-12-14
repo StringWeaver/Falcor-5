@@ -48,7 +48,8 @@ namespace
     // Names of valid entries in the parameter dictionary.
     const char kEnabled[] = "Enabled";
     const char kIterations[] = "Iterations";
-    const char kFeedbackTap[] = "FeedbackTap";
+    const char kFeedbackIteration[] = "FeedbackIteration";
+    const char kReprojectIteration[] = "ReprojectIteration";
     const char kVarianceEpsilon[] = "VarianceEpsilon";
     const char kCoefficientOfVariationEpsilon[] = "CoefficientOfVariationEpsilon";
     const char kPhiXY[] = "PhiXY";
@@ -103,7 +104,8 @@ SSGAFPass::SSGAFPass(const Dictionary& dict)
     {
         if (key == kEnabled) mFilterEnabled = value;
         else if (key == kIterations) mFilterIterations = value;
-        else if (key == kFeedbackTap) mFeedbackTap = value;
+        else if (key == kFeedbackIteration) mFeedbackIteration = value;
+        else if (key == kReprojectIteration) mReprojectIteration = value;
         else if (key == kPhiXY) mPhiXY = value;
         else if (key == kPhiDepth) mPhiDepth = value;
         else if (key == kPhiColor) mPhiColor = value;
@@ -124,7 +126,8 @@ Dictionary SSGAFPass::getScriptingDictionary()
     Dictionary dict;
     dict[kEnabled] = mFilterEnabled;
     dict[kIterations] = mFilterIterations;
-    dict[kFeedbackTap] = mFeedbackTap;
+    dict[kFeedbackIteration] = mFeedbackIteration;
+    dict[kReprojectIteration] = mReprojectIteration;
     dict[kPhiXY] = mPhiXY;
     dict[kPhiDepth] = mPhiDepth;
     dict[kPhiColor] = mPhiColor;
@@ -236,7 +239,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
     {
         // Filter illumination from pPrevIterIllumTexture, storing the result
         // in pCurrIterIllumTexture.  Along the way (or at the end, depending on
-        // the value of mFeedbackTap), save the filtered illumination for
+        // the value of mFeedbackIteration), save the filtered illumination for
         // next time into mpFilteredPastFbo.
         {
             auto perImageCB = mpAtrous["PerImageCB"];
@@ -254,17 +257,20 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
             int2 pattern = int2(0, 1);
             for (int i = -1; i < mFilterIterations; i++)
             {
-                bool isReprojectionIter = (i == std::min(mFeedbackTap - 1, mFilterIterations - 1));
+                bool isLastIteration = (i == mFilterIterations - 1);
+                bool isReprojectIter = (i == std::min(mReprojectIteration - 1, mFilterIterations - 1));
+                bool isFeedbackIter = (i == std::min(mFeedbackIteration - 1, mFilterIterations - 1));
+                
                 // Spatial Accumulation
                 if (i >= 0) {
                     for (int j = 0; j < 2; j++) {
-                        bool isLastPass = (i == mFilterIterations - 1) && !isReprojectionIter && j == 1;
+                        bool isLastPass = isLastIteration && !isReprojectIter && j == 1;
                         perImageCB["gIllumination"] = isFirstPass ? pIlluminationTexture : pPrevIterIllumTexture;
                         perImageCB["gPattern"] = pattern << i;
-                        pattern = int2(1, 0); 
+                        pattern = int2(1, 0);
                         perImageCB["gIteration"] = i;
                         perImageCB["gIsFirstPass"] = isFirstPass;
-                        perImageCB["gIsLastPass"] = isLastPass;
+                        isFirstPass = false;
                         if (isLastPass) {
                             mpAtrousFbo->attachColorTarget(pOutputColorTexture, 0);
                         }
@@ -273,7 +279,6 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                         }
 
                         mpAtrous->execute(pRenderContext, mpAtrousFbo);
-                        isFirstPass = false;
                         std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
                     }
                 }
@@ -283,11 +288,8 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                 // reprojected filtered illumination from the previous frame.
                 // Stores the result as well as initial moments and an updated
                 // per-pixel history length in mpReprojFbo.
-                if (isReprojectionIter)
+                if (isReprojectIter)
                 {
-
-                    bool isLastPass = (i == mFilterIterations - 1);
-
                     auto reprojPerImageCB = mpReprojection["PerImageCB"];
                     // Setup textures for our reprojection shader pass
                     reprojPerImageCB["gMotion"] = pMotionVectorTexture;
@@ -300,19 +302,27 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                     reprojPerImageCB["gPrevLinearZ"] = pPrevFrameLinearZTexture;
                     // Setup variables for our reprojection pass
                     reprojPerImageCB["gMaxHistoryLength"] = mMaxHistoryLength;
-                    reprojPerImageCB["gIsLastPass"] = isLastPass;
                     reprojPerImageCB["gIsFirstPass"] = isFirstPass;
                     reprojPerImageCB["gPhiDepth"] = mPhiDepth;
-
                     isFirstPass = false;
-                    mpReprojFbo->attachColorTarget(pCurrIterIllumTexture, 0);
-                    mpReprojFbo->attachColorTarget(pHistoryLengthTexture, 1);
-                    if (isLastPass) {
-                        mpReprojFbo->attachColorTarget(pOutputColorTexture, 2); 
+                    if (isLastIteration) {
+                        mpReprojFbo->attachColorTarget(pOutputColorTexture, 0);
                     }
+                    else {
+                        mpReprojFbo->attachColorTarget(pCurrIterIllumTexture, 0);
+                    }
+                    mpReprojFbo->attachColorTarget(pHistoryLengthTexture, 1);
                     mpReprojection->execute(pRenderContext, mpReprojFbo);
-                    pRenderContext->blit(pCurrIterIllumTexture->getSRV(), pPrevFrameIllumTexture->getRTV());
                     std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
+                }
+                if (isFeedbackIter) {
+                    if (isLastIteration) {
+                        pRenderContext->blit(pOutputColorTexture->getSRV(), pPrevFrameIllumTexture->getRTV());
+                    }
+
+                    else {
+                        pRenderContext->blit(pCurrIterIllumTexture->getSRV(), pPrevFrameIllumTexture->getRTV());
+                    }
                 }
             }
 
@@ -376,7 +386,8 @@ void SSGAFPass::renderUI(Gui::Widgets& widget)
     widget.text("Number of filter iterations.  Which");
     widget.text("    iteration feeds into future frames?");
     dirty |= (int)widget.var("Iterations", mFilterIterations, 0, 10, 1);
-    dirty |= (int)widget.var("Feedback Iteration", mFeedbackTap, 0, mFilterIterations, 1);
+    dirty |= (int)widget.var("Reproject Iteration", mReprojectIteration, 0, mFilterIterations, 1);
+    dirty |= (int)widget.var("Feedback Iteration", mFeedbackIteration, 0, mFilterIterations, 1);
 
     widget.text("");
     widget.text("Contol edge stopping on bilateral fitler");

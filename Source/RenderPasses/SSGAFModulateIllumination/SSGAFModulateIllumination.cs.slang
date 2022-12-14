@@ -64,7 +64,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 
     if (is_valid(gDiffuseRadiance))
     {
-        float3 diffuseColor = gDiffuseRadiance[pixel].rgb;
+        float3 diffuseColor = gDiffuseRadiance[pixel].rgb / gDiffuseRadiance[pixel].a;
 
         if (is_valid(gDiffuseReflectance))
         {
@@ -75,7 +75,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 
     if (is_valid(gSpecularRadiance))
     {
-        float3 specularColor = gSpecularRadiance[pixel].rgb;
+        float3 specularColor = gSpecularRadiance[pixel].rgb / gSpecularRadiance[pixel].a;
 
         if (is_valid(gSpecularReflectance))
         {
@@ -92,7 +92,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 
     if (is_valid(gDeltaReflectionRadiance))
     {
-        float3 deltaReflectionColor = gDeltaReflectionRadiance[pixel].rgb;
+        float3 deltaReflectionColor = gDeltaReflectionRadiance[pixel].rgb / gDeltaReflectionRadiance[pixel].a;
 
         if (is_valid(gDeltaReflectionReflectance))
         {
@@ -109,7 +109,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 
     if (is_valid(gDeltaTransmissionRadiance))
     {
-        float3 deltaTransmissionColor = gDeltaTransmissionRadiance[pixel].rgb;
+        float3 deltaTransmissionColor = gDeltaTransmissionRadiance[pixel].rgb / gDeltaTransmissionRadiance[pixel].a;
 
         if (is_valid(gDeltaTransmissionReflectance))
         {
@@ -121,7 +121,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 
     if (is_valid(gResidualRadiance))
     {
-        outputColor.rgb += gResidualRadiance[pixel].rgb;
+        outputColor.rgb += gResidualRadiance[pixel].rgb / gResidualRadiance[pixel].a;
     }
 
     gOutput[pixel] = outputColor;
