@@ -202,7 +202,7 @@ void SSGAFPass::compile(RenderContext* pRenderContext, const CompileData& compil
 
 void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderData)
 {
-    Texture::SharedPtr pDiffuseReflectanceTexture = renderData[kInputBufferReflectance]->asTexture();
+    Texture::SharedPtr pReflectanceTexture = renderData[kInputBufferReflectance]->asTexture();
     Texture::SharedPtr pIlluminationTexture = renderData[kInputBufferIllumination]->asTexture();
     Texture::SharedPtr pNormalRoughnessMaterialIDTexture = renderData[kInputNormalRoughnessMaterialID]->asTexture();
     Texture::SharedPtr pLinearZTexture = renderData[kInputBufferLinearZ]->asTexture();
@@ -245,6 +245,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
             auto perImageCB = mpAtrous["PerImageCB"];
             perImageCB["gLinearZ"] = pLinearZTexture;
             perImageCB["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
+            perImageCB["gReflectance"] = pReflectanceTexture;
             perImageCB["gPhiXY"] = mPhiXY;
             perImageCB["gPhiColor"] = mPhiColor;
             perImageCB["gPhiNormal"] = mPhiNormal;
@@ -294,7 +295,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                     // Setup textures for our reprojection shader pass
                     reprojPerImageCB["gMotion"] = pMotionVectorTexture;
                     reprojPerImageCB["gIllumination"] = isFirstPass ? pIlluminationTexture : pPrevIterIllumTexture;
-                    reprojPerImageCB["gDiffuseReflectance"] = pDiffuseReflectanceTexture;
+                    reprojPerImageCB["gReflectance"] = pReflectanceTexture;
                     reprojPerImageCB["gPrevIllum"] = pPrevFrameIllumTexture;
                     reprojPerImageCB["gPrevHistoryLength"] = pPrevHistoryLengthTexture;
                     reprojPerImageCB["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
@@ -331,7 +332,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
 
         // Compute albedo * filtered illumination and add emission back in.
         auto perImageCB = mpFinalModulate["PerImageCB"];
-        perImageCB["gDiffuseReflectance"] = pDiffuseReflectanceTexture;
+        perImageCB["gDiffuseReflectance"] = pReflectanceTexture;
         perImageCB["gIllumination"] = pPrevIterIllumTexture;
         perImageCB["gHistoryLength"] = pHistoryLengthTexture;
         perImageCB["gMaxHistoryLength"] = mMaxHistoryLength;

@@ -29,6 +29,7 @@ import Scene.ShadingData;
 import Utils.Math.MathHelpers;
 import Utils.Color.ColorHelpers;
 import SSGAFCommon;
+import RenderPasses.Shared.Denoising.NRDConstants;
 
 // Workaround for isnan() not working in slang.
 bool isNaN(float f)
@@ -41,7 +42,7 @@ cbuffer PerImageCB
 {
     Texture2D   gMotion;
     Texture2D   gIllumination;
-    Texture2D   gDiffuseReflectance;
+    Texture2D   gReflectance;
     Texture2D gPrevIllum;
     Texture2D gLinearZ;
     Texture2D gPrevLinearZ;
@@ -107,17 +108,22 @@ PS_OUT main(FullScreenPassVsOut vsOut)
 {
     const float4 posH = vsOut.posH;
     const int2 ipos = posH.xy;
-
+    PS_OUT psOut;
     float4 illumination = gIllumination[ipos];
     float historyLength;
     if (gIsFirstPass) {
-        illumination.a = 1;
+        if (any(gReflectance.Load(int3(ipos, 0)).rgb > kNRDMinReflectance)) {
+            illumination.a = 1.f;
+        } else {
+            illumination.a = 0.f;
+        }
     }
     // Workaround path tracer bugs. TODO: remove this when we can.
-    if (isNaN(illumination.x) || isNaN(illumination.y) || isNaN(illumination.z))
+    if (illumination.a == 0.f || isNaN(illumination.x) || isNaN(illumination.y) || isNaN(illumination.z))
     {
-        illumination = float4(0, 0, 0, 0);
-        historyLength = 0.f;
+        psOut.OutIllumination = float4(0, 0, 0, 0);
+        psOut.OutHistoryLength = 0.f;
+        return psOut;
     }
 
     
@@ -131,12 +137,12 @@ PS_OUT main(FullScreenPassVsOut vsOut)
 
 
     // variance *= computeVarianceScale(16, 16, alpha);
-    PS_OUT psOut;
+    
     // temporal integration of illumination
     float weightHistory = historyLength;
-    float weightCurrent = 1.f; 
+    float weightCurrent = 1.f;
     float sumWeight = weightHistory + weightCurrent;
-    psOut.OutIllumination =  (weightHistory * prevIllumination + weightCurrent * illumination) / sumWeight ;
+    psOut.OutIllumination =  float4((weightHistory * prevIllumination.rgb + weightCurrent * illumination.rgb) / sumWeight, prevIllumination.a + illumination.a) ;
     psOut.OutHistoryLength = historyLength + 1.f;
     return psOut;
 }

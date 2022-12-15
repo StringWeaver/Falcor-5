@@ -29,10 +29,12 @@ import Scene.ShadingData;
 import Utils.Math.MathHelpers;
 import Utils.Color.ColorHelpers;
 import SSGAFCommon;
+import RenderPasses.Shared.Denoising.NRDConstants;
 
 cbuffer PerImageCB
 {
     Texture2D gIllumination;
+    Texture2D gReflectance;
     Texture2D gLinearZ;
     Texture2D gNormalRoughnessMaterialID;
 
@@ -51,8 +53,9 @@ float4 main(FullScreenPassVsOut vsOut)
 {
     const int2 ipos = int2(vsOut.posH.xy);
     const int2 screenSize = getTextureDims(gIllumination, 0);
-
-    
+    if (!any(gReflectance.Load(int3(ipos, 0)).rgb > kNRDMinReflectance)) {
+        return float4(0.0);
+    }
     float4 illuminationCenter = gIllumination.Load(int3(ipos, 0));
     if (gIsFirstPass) {
         illuminationCenter.a = 1.0f;
@@ -87,7 +90,14 @@ float4 main(FullScreenPassVsOut vsOut)
             {
                 const float4 illuminationP = gIllumination.Load(int3(p, 0));
                 if (gIsFirstPass) {
-                    illuminationP.a = 1.f;
+                    if (any(gReflectance.Load(int3(p, 0)).rgb > kNRDMinReflectance )) {
+                        illuminationP.a = 1.f;
+                    } else {
+                        illuminationP.a = 0.f;
+                    }
+                }
+                if (illuminationP.a == 0.f) {
+                    continue;
                 }
                 const float illuminationLuminanceP = luminance(illuminationP.rgb);
                 const float zP = gLinearZ[p].x;
