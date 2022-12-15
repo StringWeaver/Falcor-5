@@ -267,7 +267,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                         bool isLastPass = isLastIteration && !isReprojectIter && j == 1;
                         perImageCB["gIllumination"] = isFirstPass ? pIlluminationTexture : pPrevIterIllumTexture;
                         perImageCB["gPattern"] = pattern << i;
-                        pattern = int2(1, 0);
+                        pattern = int2(pattern.y, -pattern.x);
                         perImageCB["gIteration"] = i;
                         perImageCB["gIsFirstPass"] = isFirstPass;
                         isFirstPass = false;

@@ -40,10 +40,25 @@ float computeWeight(
 {
     const float weightXY = float(xx * xx + yy * yy) /( 2 * phiXY * phiXY);
     const float weightNormal  = pow(saturate(dot(normalCenter, normalP)), phiNormal);
-    const float weightZ       = (depthCenter - depthP) / phiDepth;
-    const float weightLillum  = (luminanceIllumCenter - luminanceIllumP) / phiIllum;
-
+    const float weightZ = (depthCenter - depthP) / phiDepth;
+    const float weightLillum = (luminanceIllumCenter - luminanceIllumP) / (0.5* (luminanceIllumCenter + luminanceIllumP + 1e-5) * phiIllum);
     const float weightIllum   = exp(- weightXY - 0.5 * weightZ * weightZ - 0.5 * weightLillum * weightLillum ) * weightNormal;
+
+    return weightIllum;
+}
+
+float computeWeightBspline(
+    int i, float phiXY,
+    float depthCenter, float depthP, float phiDepth,
+    float3 normalCenter, float3 normalP, float phiNormal,
+    float luminanceIllumCenter, float luminanceIllumP, float phiIllum)
+{
+    const float kernelWeights[3] = { 1.0, 2.0 / 3.0, 1.0 / 6.0 };
+    const float weightXY = kernelWeights[i];
+    const float weightNormal = pow(saturate(dot(normalCenter, normalP)), phiNormal);
+    const float weightZ = (depthCenter - depthP) / phiDepth;
+    const float weightLillum = (luminanceIllumCenter - luminanceIllumP) / (0.5 * (luminanceIllumCenter + luminanceIllumP + 1e-5) * phiIllum);
+    const float weightIllum = exp(-weightXY - 0.5 * weightZ * weightZ - 0.5 * weightLillum * weightLillum) * weightNormal;
 
     return weightIllum;
 }

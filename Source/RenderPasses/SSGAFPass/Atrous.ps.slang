@@ -77,7 +77,7 @@ float4 main(FullScreenPassVsOut vsOut)
     float sumWIllumination = 1.0;
     float4 sumIllumination = illuminationCenter;
     int2 dxdy = gPattern;
-    for (int step = 1; step <= 50; step++)
+    for (int step = 1; step <= 2; step++)
     {
         for (int i = 0; i < 2 ; i++)
         {
@@ -100,11 +100,8 @@ float4 main(FullScreenPassVsOut vsOut)
                 } else {
                     phiLIllumination = gPhiColor;
                 }
-                const float wIllumination= computeWeight(
-                    dxdy.x, dxdy.y, gPhiXY,
-                    zCenter, zP, gPhiDepth,
-                    nCenter, nP, gPhiNormal,
-                    illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
+                const float wIllumination= computeWeight(step, 0, gPhiXY,zCenter, zP, gPhiDepth,nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
+                //const float wIllumination = computeWeightBspline(step, gPhiXY, zCenter, zP, gPhiDepth, nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
                 sumWIllumination += wIllumination;
                 sumIllumination += wIllumination * illuminationP;
             }
