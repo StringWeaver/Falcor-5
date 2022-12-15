@@ -45,7 +45,6 @@ cbuffer PerImageCB
     float gPhiDepth;
     float gIgnorePhiColorSampleCountThreshold;
     int gIteration;
-    bool gIsFirstPass;
 };
 
 float4 main(FullScreenPassVsOut vsOut)
@@ -53,13 +52,7 @@ float4 main(FullScreenPassVsOut vsOut)
 {
     const int2 ipos = int2(vsOut.posH.xy);
     const int2 screenSize = getTextureDims(gIllumination, 0);
-    if (!any(gReflectance.Load(int3(ipos, 0)).rgb > kNRDMinReflectance)) {
-        return float4(0.0);
-    }
     float4 illuminationCenter = gIllumination.Load(int3(ipos, 0));
-    if (gIsFirstPass) {
-        illuminationCenter.a = 1.0f;
-    }
     // float validSampleCountCenter = gHistoryLength[ipos].x;
     const float illuminationLuminanceCenter = luminance(illuminationCenter.rgb);
 
@@ -89,16 +82,6 @@ float4 main(FullScreenPassVsOut vsOut)
             if (inside) // skip center pixel, it is already accumulated
             {
                 const float4 illuminationP = gIllumination.Load(int3(p, 0));
-                if (gIsFirstPass) {
-                    if (any(gReflectance.Load(int3(p, 0)).rgb > kNRDMinReflectance )) {
-                        illuminationP.a = 1.f;
-                    } else {
-                        illuminationP.a = 0.f;
-                    }
-                }
-                if (illuminationP.a == 0.f) {
-                    continue;
-                }
                 const float illuminationLuminanceP = luminance(illuminationP.rgb);
                 const float zP = gLinearZ[p].x;
                 const float3 nP = oct_to_ndir_unorm(gNormalRoughnessMaterialID[p].xy);

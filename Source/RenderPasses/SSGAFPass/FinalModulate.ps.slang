@@ -51,7 +51,7 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     const int2 ipos = int2(vsOut.posH.xy);
     const float zCenter = gLinearZ[ipos].x;
     const float3 nCenter = oct_to_ndir_unorm(gNormalRoughnessMaterialID[ipos].xy);
-    psOut.outValidSampleCount = gIllumination[ipos].a / 100.f; //zCenter / 50.f;
+    psOut.outValidSampleCount = gIllumination[ipos].a / 100.f; //zCenter / 200.f;
     psOut.outDbgView1 = float4(nCenter,0.f);
     psOut.outDbgView2 = gHistoryLength[ipos].x/64.f;
     return psOut;

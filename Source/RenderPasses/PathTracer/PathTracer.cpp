@@ -173,6 +173,7 @@ namespace
     const std::string kColorFormat = "colorFormat";
 
     const std::string kUseNRDDemodulation = "useNRDDemodulation";
+    const std::string kSetRadianceAlphaToSpp = "setRadianceAlphaToSpp";
 }
 
 // Don't remove this. it's required for hot-reload to function properly
@@ -285,6 +286,7 @@ void PathTracer::parseDictionary(const Dictionary& dict)
 
         // Denoising parameters
         else if (key == kUseNRDDemodulation) mStaticParams.useNRDDemodulation = value;
+        else if (key == kSetRadianceAlphaToSpp) mStaticParams.setRadianceAlphaToSpp = value;
 
         // Output parameters
         else if (key == kOutputSize) mOutputSizeSelection = value;
@@ -401,6 +403,7 @@ Dictionary PathTracer::getScriptingDictionary()
 
     // Denoising parameters
     d[kUseNRDDemodulation] = mStaticParams.useNRDDemodulation;
+    d[kSetRadianceAlphaToSpp] = mStaticParams.setRadianceAlphaToSpp;
 
     // Output parameters
     d[kOutputSize] = mOutputSizeSelection;
@@ -654,6 +657,7 @@ bool PathTracer::renderRenderingUI(Gui::Widgets& widget)
     if (auto group = widget.group("Denoiser options"))
     {
         dirty |= widget.checkbox("Use NRD demodulation", mStaticParams.useNRDDemodulation);
+        dirty |= widget.checkbox("Set radiance alpha chanel to spp", mStaticParams.setRadianceAlphaToSpp);
         widget.tooltip("Global switch for NRD demodulation");
     }
 
@@ -1382,6 +1386,7 @@ Program::DefineList PathTracer::StaticParams::getDefines(const PathTracer& owner
     defines.add("DISABLE_CAUSTICS", disableCaustics ? "1" : "0");
     defines.add("PRIMARY_LOD_MODE", std::to_string((uint32_t)primaryLodMode));
     defines.add("USE_NRD_DEMODULATION", useNRDDemodulation ? "1" : "0");
+    defines.add("SET_RADIANCE_ALPHA_CHANNEL_TO_SPP", setRadianceAlphaToSpp ? "1" : "0");
     defines.add("COLOR_FORMAT", std::to_string((uint32_t)colorFormat));
     defines.add("MIS_HEURISTIC", std::to_string((uint32_t)misHeuristic));
     defines.add("MIS_POWER_EXPONENT", std::to_string(misPowerExponent));

@@ -51,7 +51,6 @@ cbuffer PerImageCB
 
     float gMaxHistoryLength;
     float gPhiDepth;
-    bool gIsFirstPass;
 };
 
 bool isReprjValid(int2 iposPrev,int2 ipos)
@@ -111,15 +110,8 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     PS_OUT psOut;
     float4 illumination = gIllumination[ipos];
     float historyLength;
-    if (gIsFirstPass) {
-        if (any(gReflectance.Load(int3(ipos, 0)).rgb > kNRDMinReflectance)) {
-            illumination.a = 1.f;
-        } else {
-            illumination.a = 0.f;
-        }
-    }
     // Workaround path tracer bugs. TODO: remove this when we can.
-    if (illumination.a == 0.f || isNaN(illumination.x) || isNaN(illumination.y) || isNaN(illumination.z))
+    if (isNaN(illumination.x) || isNaN(illumination.y) || isNaN(illumination.z))
     {
         psOut.OutIllumination = float4(0, 0, 0, 0);
         psOut.OutHistoryLength = 0.f;

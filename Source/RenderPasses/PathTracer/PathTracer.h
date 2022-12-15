@@ -139,6 +139,7 @@ private:
 
         // Denoising parameters
         bool        useNRDDemodulation = true;                  ///< Global switch for NRD demodulation.
+        bool        setRadianceAlphaToSpp = false; ///< Set this to true for SSGAF Pass
 
         Program::DefineList getDefines(const PathTracer& owner) const;
     };

@@ -67,6 +67,7 @@ struct ResolvePass
 
     static const bool kOutputGuideData = OUTPUT_GUIDE_DATA;
     static const bool kOutputNRDData = OUTPUT_NRD_DATA;
+    static const bool kSetRadianceAlphaToSpp = SET_RADIANCE_ALPHA_CHANNEL_TO_SPP;
 
     /** Entry point for resolve pass.
         \param[in] pixel Pixel coordinates.
@@ -133,6 +134,11 @@ struct ResolvePass
             float3 deltaReflectionRadiance = 0.f;
             float3 deltaTransmissionRadiance = 0.f;
             float3 residualRadiance = 0.f;
+            float diffuseSpp = 0.f;
+            float specularSpp = 0.f;
+            float deltaReflectionSpp = 0.f;
+            float deltaTransmissionSpp = 0.f;
+            float residualSpp = 0.f;
             float hitDist = 0.f;
 
             for (uint sampleIdx = 0; sampleIdx < spp; sampleIdx++)
@@ -151,30 +157,43 @@ struct ResolvePass
                 {
                 case NRDPathType::Diffuse:
                     diffuseRadiance += demodulatedRadiance;
+                    diffuseSpp += 1.0f;
                     break;
                 case NRDPathType::Specular:
                     specularRadiance += demodulatedRadiance;
+                    specularSpp += 1.0f;
                     break;
                 case NRDPathType::DeltaReflection:
                     deltaReflectionRadiance += demodulatedRadiance;
+                    deltaReflectionSpp += 1.0f;
                     break;
                 case NRDPathType::DeltaTransmission:
                     deltaTransmissionRadiance += demodulatedRadiance;
+                    deltaTransmissionSpp += 1.0f;
                     break;
                 default:
                     // Do not demodulate residual.
                     residualRadiance += radiance;
+                    residualSpp += 1.0f;
                     break;
                 }
 
                 hitDist += sampleNRDHitDist[idx];
             }
 
-            outputNRDDiffuseRadianceHitDist[pixel] = float4(invSpp * diffuseRadiance, invSpp * hitDist);
-            outputNRDSpecularRadianceHitDist[pixel] = float4(invSpp * specularRadiance, invSpp * hitDist);
-            outputNRDDeltaReflectionRadianceHitDist[pixel] = float4(invSpp * deltaReflectionRadiance, 0.f);
-            outputNRDDeltaTransmissionRadianceHitDist[pixel] = float4(invSpp * deltaTransmissionRadiance, 0.f);
-            outputNRDResidualRadianceHitDist[pixel] = float4(invSpp * residualRadiance, hitDist);
+            if (kSetRadianceAlphaToSpp) {               
+                outputNRDDiffuseRadianceHitDist[pixel] = float4(invSpp * diffuseRadiance, spp);
+                outputNRDSpecularRadianceHitDist[pixel] = float4(invSpp * specularRadiance, spp);
+                outputNRDDeltaReflectionRadianceHitDist[pixel] = float4(invSpp * deltaReflectionRadiance, spp);
+                outputNRDDeltaTransmissionRadianceHitDist[pixel] = float4(invSpp * deltaTransmissionRadiance, spp);
+                outputNRDResidualRadianceHitDist[pixel] = float4(invSpp * residualRadiance, spp);
+            } else {
+                outputNRDDiffuseRadianceHitDist[pixel] = float4(invSpp * diffuseRadiance, invSpp * hitDist);
+                outputNRDSpecularRadianceHitDist[pixel] = float4(invSpp * specularRadiance, invSpp * hitDist);
+                outputNRDDeltaReflectionRadianceHitDist[pixel] = float4(invSpp * deltaReflectionRadiance, 0.f);
+                outputNRDDeltaTransmissionRadianceHitDist[pixel] = float4(invSpp * deltaTransmissionRadiance, 0.f);
+                outputNRDResidualRadianceHitDist[pixel] = float4(invSpp * residualRadiance, hitDist);
+            }  
         }
     }
 };

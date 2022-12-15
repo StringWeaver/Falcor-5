@@ -51,7 +51,6 @@ namespace
     const char kFeedbackIteration[] = "FeedbackIteration";
     const char kReprojectIteration[] = "ReprojectIteration";
     const char kVarianceEpsilon[] = "VarianceEpsilon";
-    const char kCoefficientOfVariationEpsilon[] = "CoefficientOfVariationEpsilon";
     const char kPhiXY[] = "PhiXY";
     const char kPhiDepth[] = "PhiDepth";
     const char kPhiColor[] = "PhiColor";
@@ -76,7 +75,7 @@ namespace
 
     // Output buffer name
     const char kOutputBufferFilteredImage[] = "Filtered image";
-    const char kOutputBufferCoefficientOfVariation[] = "Coefficient of Variation";
+    const char kOutputBufferEquivalentSpp[] = "EquivalentSpp";
     const char  kOutputBufferDebugView1[] = "Debug View 1";
     const char  kOutputBufferDebugView2[] = "Debug View 2";
 }
@@ -179,7 +178,7 @@ RenderPassReflection SSGAFPass::reflect(const CompileData& compileData)
         .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
 
     reflector.addOutput(kOutputBufferFilteredImage, "Filtered image").format(ResourceFormat::RGBA32Float);
-    reflector.addOutput(kOutputBufferCoefficientOfVariation, "Coefficient of Variation").format(ResourceFormat::R16Float).bindFlags(Resource::BindFlags::RenderTarget);
+    reflector.addOutput(kOutputBufferEquivalentSpp, "EquivalentSpp").format(ResourceFormat::R16Float).bindFlags(Resource::BindFlags::RenderTarget);
     reflector.addOutput(kOutputBufferDebugView1, kOutputBufferDebugView1).format(ResourceFormat::RGBA16Float).bindFlags(Resource::BindFlags::RenderTarget);
     reflector.addOutput(kOutputBufferDebugView2, kOutputBufferDebugView2).format(ResourceFormat::R16Float).bindFlags(Resource::BindFlags::RenderTarget);
 
@@ -224,7 +223,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
 
 
     Texture::SharedPtr pOutputColorTexture = renderData[kOutputBufferFilteredImage]->asTexture();
-    Texture::SharedPtr pOutputCoefficientOfVariationTexture = renderData[kOutputBufferCoefficientOfVariation]->asTexture();
+    Texture::SharedPtr pOutputEquivalentSppTexture = renderData[kOutputBufferEquivalentSpp]->asTexture();
     Texture::SharedPtr pOutputDebugView1Texture = renderData[kOutputBufferDebugView1]->asTexture();
     Texture::SharedPtr pOutputDebugView2Texture = renderData[kOutputBufferDebugView2]->asTexture();
 
@@ -270,7 +269,6 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                         perImageCB["gPattern"] = pattern << i;
                         pattern = int2(pattern.y, -pattern.x);
                         perImageCB["gIteration"] = i;
-                        perImageCB["gIsFirstPass"] = isFirstPass;
                         isFirstPass = false;
                         if (isLastPass) {
                             mpAtrousFbo->attachColorTarget(pOutputColorTexture, 0);
@@ -303,7 +301,6 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                     reprojPerImageCB["gPrevLinearZ"] = pPrevFrameLinearZTexture;
                     // Setup variables for our reprojection pass
                     reprojPerImageCB["gMaxHistoryLength"] = mMaxHistoryLength;
-                    reprojPerImageCB["gIsFirstPass"] = isFirstPass;
                     reprojPerImageCB["gPhiDepth"] = mPhiDepth;
                     isFirstPass = false;
                     if (isLastIteration) {
@@ -333,12 +330,12 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
         // Compute albedo * filtered illumination and add emission back in.
         auto perImageCB = mpFinalModulate["PerImageCB"];
         perImageCB["gDiffuseReflectance"] = pReflectanceTexture;
-        perImageCB["gIllumination"] = pPrevIterIllumTexture;
+        perImageCB["gIllumination"] = pOutputColorTexture;
         perImageCB["gHistoryLength"] = pHistoryLengthTexture;
         perImageCB["gMaxHistoryLength"] = mMaxHistoryLength;
         perImageCB["gLinearZ"] = pLinearZTexture;
         perImageCB["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
-        mpFinalFbo->attachColorTarget(pOutputCoefficientOfVariationTexture, 0);
+        mpFinalFbo->attachColorTarget(pOutputEquivalentSppTexture, 0);
         mpFinalFbo->attachColorTarget(pOutputDebugView1Texture, 1);
         mpFinalFbo->attachColorTarget(pOutputDebugView2Texture, 2);
         mpFinalModulate->execute(pRenderContext, mpFinalFbo);
@@ -367,7 +364,7 @@ void SSGAFPass::clearBuffers(RenderContext* pRenderContext, const RenderData& re
     pRenderContext->clearTexture(renderData[kInternalBufferHistoryLength1]->asTexture().get());
     pRenderContext->clearTexture(renderData[kInternalBufferAtrousResult0]->asTexture().get());
     pRenderContext->clearTexture(renderData[kInternalBufferAtrousResult1]->asTexture().get());
-    pRenderContext->clearTexture(renderData[kOutputBufferCoefficientOfVariation]->asTexture().get());
+    pRenderContext->clearTexture(renderData[kOutputBufferEquivalentSpp]->asTexture().get());
     
 }
 
