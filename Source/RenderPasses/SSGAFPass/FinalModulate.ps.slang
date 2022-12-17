@@ -38,12 +38,13 @@ cbuffer PerImageCB
     Texture2D gLinearZ;
     Texture2D gNormalRoughnessMaterialID;
     float gMaxHistoryLength;
+    float gDbgViewScaleFactor;
     
 };
 struct PS_OUT{
-    float outValidSampleCount : SV_TARGET0;
-    float4 outDbgView1 : SV_TARGET1;
-    float outDbgView2 : SV_TARGET2;
+    float outDbgView0 : SV_TARGET0;
+    float outDbgView1 : SV_TARGET1;
+    float4 outDbgView2 : SV_TARGET2;
 }
 PS_OUT main(FullScreenPassVsOut vsOut) 
 {
@@ -51,8 +52,8 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     const int2 ipos = int2(vsOut.posH.xy);
     const float zCenter = gLinearZ[ipos].x;
     const float3 nCenter = oct_to_ndir_unorm(gNormalRoughnessMaterialID[ipos].xy);
-    psOut.outValidSampleCount = gIllumination[ipos].a / 100.f; //zCenter / 200.f;
-    psOut.outDbgView1 = float4(nCenter,0.f);
-    psOut.outDbgView2 = gHistoryLength[ipos].x/64.f;
+    psOut.outDbgView0 = gIllumination[ipos].a * gDbgViewScaleFactor;
+    psOut.outDbgView1 = gHistoryLength[ipos].x * gDbgViewScaleFactor;
+    psOut.outDbgView2 = float4(nCenter, 0.f) * gDbgViewScaleFactor;
     return psOut;
 }

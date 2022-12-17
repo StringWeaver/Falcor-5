@@ -75,7 +75,7 @@ namespace
 
     // Output buffer name
     const char kOutputBufferFilteredImage[] = "Filtered image";
-    const char kOutputBufferEquivalentSpp[] = "EquivalentSpp";
+    const char kOutputBufferDebugView0[] = "Debug View 0";
     const char  kOutputBufferDebugView1[] = "Debug View 1";
     const char  kOutputBufferDebugView2[] = "Debug View 2";
 }
@@ -178,9 +178,9 @@ RenderPassReflection SSGAFPass::reflect(const CompileData& compileData)
         .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
 
     reflector.addOutput(kOutputBufferFilteredImage, "Filtered image").format(ResourceFormat::RGBA32Float);
-    reflector.addOutput(kOutputBufferEquivalentSpp, "EquivalentSpp").format(ResourceFormat::R16Float).bindFlags(Resource::BindFlags::RenderTarget);
-    reflector.addOutput(kOutputBufferDebugView1, kOutputBufferDebugView1).format(ResourceFormat::RGBA16Float).bindFlags(Resource::BindFlags::RenderTarget);
-    reflector.addOutput(kOutputBufferDebugView2, kOutputBufferDebugView2).format(ResourceFormat::R16Float).bindFlags(Resource::BindFlags::RenderTarget);
+    reflector.addOutput(kOutputBufferDebugView0, kOutputBufferDebugView0).format(ResourceFormat::R16Float).bindFlags(Resource::BindFlags::RenderTarget);
+    reflector.addOutput(kOutputBufferDebugView1, kOutputBufferDebugView1).format(ResourceFormat::R16Float).bindFlags(Resource::BindFlags::RenderTarget);
+    reflector.addOutput(kOutputBufferDebugView2, kOutputBufferDebugView2).format(ResourceFormat::RGBA16Float).bindFlags(Resource::BindFlags::RenderTarget);
 
     return reflector;
 }
@@ -223,7 +223,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
 
 
     Texture::SharedPtr pOutputColorTexture = renderData[kOutputBufferFilteredImage]->asTexture();
-    Texture::SharedPtr pOutputEquivalentSppTexture = renderData[kOutputBufferEquivalentSpp]->asTexture();
+    Texture::SharedPtr pOutputDebugView0Texture = renderData[kOutputBufferDebugView0]->asTexture();
     Texture::SharedPtr pOutputDebugView1Texture = renderData[kOutputBufferDebugView1]->asTexture();
     Texture::SharedPtr pOutputDebugView2Texture = renderData[kOutputBufferDebugView2]->asTexture();
 
@@ -335,7 +335,8 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
         perImageCB["gMaxHistoryLength"] = mMaxHistoryLength;
         perImageCB["gLinearZ"] = pLinearZTexture;
         perImageCB["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
-        mpFinalFbo->attachColorTarget(pOutputEquivalentSppTexture, 0);
+        perImageCB["gDbgViewScaleFactor"] = mDbgViewScaleFactor;
+        mpFinalFbo->attachColorTarget(pOutputDebugView0Texture, 0);
         mpFinalFbo->attachColorTarget(pOutputDebugView1Texture, 1);
         mpFinalFbo->attachColorTarget(pOutputDebugView2Texture, 2);
         mpFinalModulate->execute(pRenderContext, mpFinalFbo);
@@ -364,7 +365,9 @@ void SSGAFPass::clearBuffers(RenderContext* pRenderContext, const RenderData& re
     pRenderContext->clearTexture(renderData[kInternalBufferHistoryLength1]->asTexture().get());
     pRenderContext->clearTexture(renderData[kInternalBufferAtrousResult0]->asTexture().get());
     pRenderContext->clearTexture(renderData[kInternalBufferAtrousResult1]->asTexture().get());
-    pRenderContext->clearTexture(renderData[kOutputBufferEquivalentSpp]->asTexture().get());
+    pRenderContext->clearTexture(renderData[kOutputBufferDebugView0]->asTexture().get());
+    pRenderContext->clearTexture(renderData[kOutputBufferDebugView1]->asTexture().get());
+    pRenderContext->clearTexture(renderData[kOutputBufferDebugView2]->asTexture().get());
     
 }
 
@@ -400,6 +403,10 @@ void SSGAFPass::renderUI(Gui::Widgets& widget)
     widget.text("How much history should be used?");
     widget.text("    (MaxHistoryLength;  1 = no reuse)");
     dirty |= (int)widget.var("Max HistoryLength", mMaxHistoryLength, 1.0f, 32.0f, 1.0f);
+
+    widget.text("");
+    widget.text("Control Debug View");
+    dirty |= (int)widget.var("Scale Factor", mDbgViewScaleFactor, 0.f, 32.0f);
 
     
 

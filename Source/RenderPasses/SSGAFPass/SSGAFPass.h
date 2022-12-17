@@ -64,6 +64,7 @@ private:
     float   mPhiNormal           = 128.0f;
     float   mPhiDepth            = 1.f;
     float   mMaxHistoryLength    = 32.0f;
+    float   mDbgViewScaleFactor = 0.01f;
     bool    mPrevFrameTextureIndex  = 0;
 
     // SSGAF passes

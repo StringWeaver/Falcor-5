@@ -41,7 +41,7 @@ float computeWeight(
     const float weightXY = float(xx * xx + yy * yy) /( 2 * phiXY * phiXY);
     const float weightNormal  = pow(saturate(dot(normalCenter, normalP)), phiNormal);
     const float weightZ = (depthCenter - depthP) / phiDepth;
-    const float weightLillum = (luminanceIllumCenter - luminanceIllumP) / (0.5* (luminanceIllumCenter + luminanceIllumP + 1e-5) * phiIllum);
+    const float weightLillum = (luminanceIllumCenter - luminanceIllumP) / phiIllum;
     const float weightIllum   = exp(- weightXY - 0.5 * weightZ * weightZ - 0.5 * weightLillum * weightLillum ) * weightNormal;
 
     return weightIllum;
