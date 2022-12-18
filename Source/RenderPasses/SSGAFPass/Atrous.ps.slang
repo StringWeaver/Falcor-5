@@ -71,7 +71,10 @@ float4 main(FullScreenPassVsOut vsOut)
     // explicitly store/accumulate center pixel with weight 1 to prevent issues
     // with the edge-stopping functions
     float sumWIllumination = 1.0;
-    float4 sumIllumination = illuminationCenter;
+    float3 sumIllumination = illuminationCenter.rgb;
+    half sumSpp, sum2ndMoment;
+    unpackSppAndMoment(illuminationCenter.a, sumSpp, sum2ndMoment);
+    half sppCenter = sumSpp;
     int2 dxdy = gPattern;
     for (int step = 1; step <= 32; step++)
     {
@@ -85,10 +88,11 @@ float4 main(FullScreenPassVsOut vsOut)
                 const float illuminationLuminanceP = luminance(illuminationP.rgb);
                 const float zP = gLinearZ[p].x;
                 const float3 nP = oct_to_ndir_unorm(gNormalRoughnessMaterialID[p].xy);
-
+                half sppP, o2ndMomentP;
+                unpackSppAndMoment(illuminationP.a, sppP, o2ndMomentP);
                 // compute the edge-stopping functions
                 float phiLIllumination;
-                if (illuminationCenter.a < gIgnorePhiColorSampleCountThreshold || illuminationP.a < gIgnorePhiColorSampleCountThreshold) {
+                if (sppCenter < gIgnorePhiColorSampleCountThreshold || sppP < gIgnorePhiColorSampleCountThreshold) {
                     phiLIllumination = 1e5;
                 } else {
                     phiLIllumination = gPhiColor;
@@ -96,14 +100,18 @@ float4 main(FullScreenPassVsOut vsOut)
                 const float wIllumination= computeWeight(step, 0, gPhiXY,zCenter, zP, gPhiDepth,nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
                 //const float wIllumination = computeWeightBspline(step, gPhiXY, zCenter, zP, gPhiDepth, nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
                 sumWIllumination += wIllumination;
-                sumIllumination += wIllumination * illuminationP;
+                sumIllumination += wIllumination * illuminationP.rgb;
+                sumSpp += half(wIllumination) * sppP;
+                sum2ndMoment += half(wIllumination) * o2ndMomentP;
             }
             dxdy = -dxdy;
         }
         dxdy += gPattern;
     }
+    sum2ndMoment /= half(sumWIllumination);
+    float packedSppAndMoment = packSppAndMoment(sumSpp, sum2ndMoment);
 
-    return float4(sumIllumination.rgb / sumWIllumination, sumIllumination.a);
+    return float4(sumIllumination.rgb / sumWIllumination, packedSppAndMoment);
 
     
 }

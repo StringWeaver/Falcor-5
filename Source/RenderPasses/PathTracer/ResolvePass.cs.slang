@@ -29,6 +29,7 @@ import RenderPasses.Shared.Denoising.NRDData;
 import ColorType;
 import GuideData;
 import Params;
+import SSGAFCommon;
 
 /** Compute shader implementing a sample resolve pass.
 
@@ -134,11 +135,11 @@ struct ResolvePass
             float3 deltaReflectionRadiance = 0.f;
             float3 deltaTransmissionRadiance = 0.f;
             float3 residualRadiance = 0.f;
-            float diffuseSpp = 0.f;
-            float specularSpp = 0.f;
-            float deltaReflectionSpp = 0.f;
-            float deltaTransmissionSpp = 0.f;
-            float residualSpp = 0.f;
+            float16_t diffuse2ndMoment = 0.f;
+            float16_t specular2ndMoment = 0.f;
+            float16_t deltaReflection2ndMoment = 0.f;
+            float16_t deltaTransmission2ndMoment = 0.f;
+            float16_t residual2ndMoment = 0.f;
             float hitDist = 0.f;
 
             for (uint sampleIdx = 0; sampleIdx < spp; sampleIdx++)
@@ -157,36 +158,36 @@ struct ResolvePass
                 {
                 case NRDPathType::Diffuse:
                     diffuseRadiance += demodulatedRadiance;
-                    diffuseSpp += 1.0f;
+                    diffuse2ndMoment += calc2ndMoment(demodulatedRadiance);
                     break;
                 case NRDPathType::Specular:
                     specularRadiance += demodulatedRadiance;
-                    specularSpp += 1.0f;
+                    specular2ndMoment += calc2ndMoment(demodulatedRadiance);
                     break;
                 case NRDPathType::DeltaReflection:
                     deltaReflectionRadiance += demodulatedRadiance;
-                    deltaReflectionSpp += 1.0f;
+                    deltaReflection2ndMoment += calc2ndMoment(demodulatedRadiance);
                     break;
                 case NRDPathType::DeltaTransmission:
                     deltaTransmissionRadiance += demodulatedRadiance;
-                    deltaTransmissionSpp += 1.0f;
+                    deltaTransmission2ndMoment += calc2ndMoment(demodulatedRadiance);
                     break;
                 default:
                     // Do not demodulate residual.
                     residualRadiance += radiance;
-                    residualSpp += 1.0f;
+                    residual2ndMoment += calc2ndMoment(demodulatedRadiance);
                     break;
                 }
 
                 hitDist += sampleNRDHitDist[idx];
             }
 
-            if (kSetRadianceAlphaToSpp) {               
-                outputNRDDiffuseRadianceHitDist[pixel] = float4(invSpp * diffuseRadiance, spp);
-                outputNRDSpecularRadianceHitDist[pixel] = float4(invSpp * specularRadiance, spp);
-                outputNRDDeltaReflectionRadianceHitDist[pixel] = float4(invSpp * deltaReflectionRadiance, spp);
-                outputNRDDeltaTransmissionRadianceHitDist[pixel] = float4(invSpp * deltaTransmissionRadiance, spp);
-                outputNRDResidualRadianceHitDist[pixel] = float4(invSpp * residualRadiance, spp);
+            if (kSetRadianceAlphaToSpp) {
+                outputNRDDiffuseRadianceHitDist[pixel] = float4(invSpp * diffuseRadiance, packSppAndMoment(spp, diffuse2ndMoment / half(spp)));
+                outputNRDSpecularRadianceHitDist[pixel] = float4(invSpp * specularRadiance, packSppAndMoment(spp, specular2ndMoment / half(spp)));
+                outputNRDDeltaReflectionRadianceHitDist[pixel] = float4(invSpp * deltaReflectionRadiance, packSppAndMoment(spp, deltaReflection2ndMoment / half(spp)));
+                outputNRDDeltaTransmissionRadianceHitDist[pixel] = float4(invSpp * deltaTransmissionRadiance, packSppAndMoment(spp, deltaTransmission2ndMoment / half(spp)));
+                outputNRDResidualRadianceHitDist[pixel] = float4(invSpp * residualRadiance, packSppAndMoment(spp, residual2ndMoment / half(spp)));
             } else {
                 outputNRDDiffuseRadianceHitDist[pixel] = float4(invSpp * diffuseRadiance, invSpp * hitDist);
                 outputNRDSpecularRadianceHitDist[pixel] = float4(invSpp * specularRadiance, invSpp * hitDist);

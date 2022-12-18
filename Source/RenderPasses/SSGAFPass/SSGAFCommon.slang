@@ -25,6 +25,19 @@
  # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **************************************************************************/
+import Utils.Color.ColorHelpers;
+
+///////////////////////////////////////////////////////////////////////////////
+//                          32*bit float
+///////////////////////////////////////////////////////////////////////////////
+uint packHalf2x16(float16_t2 v) {
+    return (asuint(v.y) << 16 | asuint(v.x)); // [y,x]
+}
+float16_t2 unpackHalf2x16(uint packed) {
+    return float16_t2(asfloat16(uint16_t(packed & 0xffff)), asfloat16(uint16_t(packed >> 16)));
+}
+
+
 int2 getTextureDims(Texture2D tex, uint mip)
 {
     uint w, h;
@@ -66,7 +79,21 @@ float3 demodulate(float3 c, float3 albedo)
 {
     return c / max(albedo, float3(0.001, 0.001, 0.001));
 }
-
+float16_t calc2ndMoment(float3 color) {
+    float16_t moment = float16_t(luminance(color));
+    return moment * moment;
+}
+float packSppAndMoment(uint spp, float16_t moment) {
+    return asfloat(packHalf2x16(float16_t2(float16_t(spp), moment)));
+}
+float packSppAndMoment(float16_t spp, float16_t moment) {
+    return asfloat(packHalf2x16(float16_t2(spp, moment)));
+}
+void unpackSppAndMoment(in float packed, out float16_t outSpp, out float16_t out2ndmoment) {
+    float16_t2 unpacked = unpackHalf2x16(asuint(packed));
+    outSpp = unpacked.x;
+    out2ndmoment = unpacked.y;
+}
 struct FullScreenPassVsOut
 {
     float2 texC       : TEXCOORD;

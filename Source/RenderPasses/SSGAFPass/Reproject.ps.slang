@@ -117,24 +117,36 @@ PS_OUT main(FullScreenPassVsOut vsOut)
         psOut.OutHistoryLength = 0.f;
         return psOut;
     }
+    float16_t newSpp;
+    float16_t new2ndMoment;
+    unpackSppAndMoment(illumination.a, newSpp, new2ndMoment);
+    packSppAndMoment(newSpp, new2ndMoment);
 
-    
     float4 prevIllumination;
+    float16_t oldSpp;
+    float16_t old2ndMoment;
     bool success = loadPrevData(posH.xy, prevIllumination, historyLength);
-    const float eps = 1e-6;
-    if (historyLength >  gMaxHistoryLength - eps) { // historyLength >=  gMaxHistoryLength
-        prevIllumination.a *= (gMaxHistoryLength - 1.f) / historyLength;
-        historyLength = gMaxHistoryLength - 1.f;
+    if (success) {
+        unpackSppAndMoment(prevIllumination.a, oldSpp, old2ndMoment);
+    } else {
+        oldSpp = half(0.0);
+        old2ndMoment = half(0.0);
     }
-
-
+    const float eps = 1e-6;
+    if (historyLength > gMaxHistoryLength - eps) { // historyLength >=  gMaxHistoryLength
+        float temporalRetireFactor = (gMaxHistoryLength - 1.f) / historyLength;
+        historyLength = gMaxHistoryLength - 1.f;
+        oldSpp *= half(temporalRetireFactor);
+    }
     // variance *= computeVarianceScale(16, 16, alpha);
-    
+
     // temporal integration of illumination
-    float weightHistory = historyLength;
-    float weightCurrent = 1.f;
-    float sumWeight = weightHistory + weightCurrent;
-    psOut.OutIllumination =  float4((weightHistory * prevIllumination.rgb + weightCurrent * illumination.rgb) / sumWeight, prevIllumination.a + illumination.a) ;
+    half weightHistory = oldSpp / (newSpp + oldSpp);
+    newSpp = oldSpp +  newSpp;
+    new2ndMoment = lerp(new2ndMoment,old2ndMoment, weightHistory);
+    float packedNewSppAndMoment = packSppAndMoment(newSpp, new2ndMoment);
+    float3 newIllumination = lerp(illumination.rgb, prevIllumination.rgb, float(weightHistory));
+    psOut.OutIllumination =  float4(newIllumination, packedNewSppAndMoment) ;
     psOut.OutHistoryLength = historyLength + 1.f;
     return psOut;
 }
