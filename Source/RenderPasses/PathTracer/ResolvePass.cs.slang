@@ -29,7 +29,7 @@ import RenderPasses.Shared.Denoising.NRDData;
 import ColorType;
 import GuideData;
 import Params;
-import SSGAFCommon;
+import RenderPasses.SSGAFPass.SSGAFCommon;
 
 /** Compute shader implementing a sample resolve pass.
 
@@ -135,11 +135,11 @@ struct ResolvePass
             float3 deltaReflectionRadiance = 0.f;
             float3 deltaTransmissionRadiance = 0.f;
             float3 residualRadiance = 0.f;
-            float16_t diffuse2ndMoment = 0.f;
-            float16_t specular2ndMoment = 0.f;
-            float16_t deltaReflection2ndMoment = 0.f;
-            float16_t deltaTransmission2ndMoment = 0.f;
-            float16_t residual2ndMoment = 0.f;
+            float diffuse2ndMoment = 0.f;
+            float specular2ndMoment = 0.f;
+            float deltaReflection2ndMoment = 0.f;
+            float deltaTransmission2ndMoment = 0.f;
+            float residual2ndMoment = 0.f;
             float hitDist = 0.f;
 
             for (uint sampleIdx = 0; sampleIdx < spp; sampleIdx++)
@@ -183,11 +183,12 @@ struct ResolvePass
             }
 
             if (kSetRadianceAlphaToSpp) {
-                outputNRDDiffuseRadianceHitDist[pixel] = float4(invSpp * diffuseRadiance, packSppAndMoment(spp, diffuse2ndMoment / half(spp)));
-                outputNRDSpecularRadianceHitDist[pixel] = float4(invSpp * specularRadiance, packSppAndMoment(spp, specular2ndMoment / half(spp)));
-                outputNRDDeltaReflectionRadianceHitDist[pixel] = float4(invSpp * deltaReflectionRadiance, packSppAndMoment(spp, deltaReflection2ndMoment / half(spp)));
-                outputNRDDeltaTransmissionRadianceHitDist[pixel] = float4(invSpp * deltaTransmissionRadiance, packSppAndMoment(spp, deltaTransmission2ndMoment / half(spp)));
-                outputNRDResidualRadianceHitDist[pixel] = float4(invSpp * residualRadiance, packSppAndMoment(spp, residual2ndMoment / half(spp)));
+                const float sppFloat = float(spp);
+                outputNRDDiffuseRadianceHitDist[pixel] = float4(invSpp * diffuseRadiance, packSppAndMoment(sppFloat, invSpp * specular2ndMoment));
+                outputNRDSpecularRadianceHitDist[pixel] = float4(invSpp * specularRadiance, packSppAndMoment(sppFloat, invSpp * specular2ndMoment));
+                outputNRDDeltaReflectionRadianceHitDist[pixel] = float4(invSpp * deltaReflectionRadiance, packSppAndMoment(sppFloat, invSpp * deltaReflection2ndMoment));
+                outputNRDDeltaTransmissionRadianceHitDist[pixel] = float4(invSpp * deltaTransmissionRadiance, packSppAndMoment(sppFloat, invSpp * deltaTransmission2ndMoment));
+                outputNRDResidualRadianceHitDist[pixel] = float4(invSpp * residualRadiance, packSppAndMoment(sppFloat, invSpp * residual2ndMoment ));
             } else {
                 outputNRDDiffuseRadianceHitDist[pixel] = float4(invSpp * diffuseRadiance, invSpp * hitDist);
                 outputNRDSpecularRadianceHitDist[pixel] = float4(invSpp * specularRadiance, invSpp * hitDist);

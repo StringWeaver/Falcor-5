@@ -52,7 +52,7 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     const int2 ipos = int2(vsOut.posH.xy);
     const float zCenter = gLinearZ[ipos].x;
     const float3 nCenter = oct_to_ndir_unorm(gNormalRoughnessMaterialID[ipos].xy);
-    half spp, o2ndMoment;
+    float spp, o2ndMoment;
     unpackSppAndMoment(gIllumination[ipos].a, spp, o2ndMoment);
     psOut.outDbgView0 = spp * gDbgViewScaleFactor;
     psOut.outDbgView1 = o2ndMoment * gDbgViewScaleFactor;

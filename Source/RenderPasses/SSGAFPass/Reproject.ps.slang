@@ -117,35 +117,35 @@ PS_OUT main(FullScreenPassVsOut vsOut)
         psOut.OutHistoryLength = 0.f;
         return psOut;
     }
-    float16_t newSpp;
-    float16_t new2ndMoment;
+    float newSpp;
+    float new2ndMoment;
     unpackSppAndMoment(illumination.a, newSpp, new2ndMoment);
     packSppAndMoment(newSpp, new2ndMoment);
 
     float4 prevIllumination;
-    float16_t oldSpp;
-    float16_t old2ndMoment;
+    float oldSpp;
+    float old2ndMoment;
     bool success = loadPrevData(posH.xy, prevIllumination, historyLength);
     if (success) {
         unpackSppAndMoment(prevIllumination.a, oldSpp, old2ndMoment);
     } else {
-        oldSpp = half(0.0);
-        old2ndMoment = half(0.0);
+        oldSpp = 0.f;
+        old2ndMoment = 0.f;
     }
     const float eps = 1e-6;
     if (historyLength > gMaxHistoryLength - eps) { // historyLength >=  gMaxHistoryLength
         float temporalRetireFactor = (gMaxHistoryLength - 1.f) / historyLength;
         historyLength = gMaxHistoryLength - 1.f;
-        oldSpp *= half(temporalRetireFactor);
+        oldSpp *= temporalRetireFactor;
     }
     // variance *= computeVarianceScale(16, 16, alpha);
 
     // temporal integration of illumination
-    half weightHistory = oldSpp / (newSpp + oldSpp);
+    float weightHistory = oldSpp / (newSpp + oldSpp);
     newSpp = oldSpp +  newSpp;
     new2ndMoment = lerp(new2ndMoment,old2ndMoment, weightHistory);
     float packedNewSppAndMoment = packSppAndMoment(newSpp, new2ndMoment);
-    float3 newIllumination = lerp(illumination.rgb, prevIllumination.rgb, float(weightHistory));
+    float3 newIllumination = lerp(illumination.rgb, prevIllumination.rgb, weightHistory);
     psOut.OutIllumination =  float4(newIllumination, packedNewSppAndMoment) ;
     psOut.OutHistoryLength = historyLength + 1.f;
     return psOut;

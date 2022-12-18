@@ -72,9 +72,9 @@ float4 main(FullScreenPassVsOut vsOut)
     // with the edge-stopping functions
     float sumWIllumination = 1.0;
     float3 sumIllumination = illuminationCenter.rgb;
-    half sumSpp, sum2ndMoment;
+    float sumSpp, sum2ndMoment;
     unpackSppAndMoment(illuminationCenter.a, sumSpp, sum2ndMoment);
-    half sppCenter = sumSpp;
+    float sppCenter = sumSpp;
     int2 dxdy = gPattern;
     for (int step = 1; step <= 32; step++)
     {
@@ -88,7 +88,7 @@ float4 main(FullScreenPassVsOut vsOut)
                 const float illuminationLuminanceP = luminance(illuminationP.rgb);
                 const float zP = gLinearZ[p].x;
                 const float3 nP = oct_to_ndir_unorm(gNormalRoughnessMaterialID[p].xy);
-                half sppP, o2ndMomentP;
+                float sppP, o2ndMomentP;
                 unpackSppAndMoment(illuminationP.a, sppP, o2ndMomentP);
                 // compute the edge-stopping functions
                 float phiLIllumination;
@@ -101,14 +101,14 @@ float4 main(FullScreenPassVsOut vsOut)
                 //const float wIllumination = computeWeightBspline(step, gPhiXY, zCenter, zP, gPhiDepth, nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
                 sumWIllumination += wIllumination;
                 sumIllumination += wIllumination * illuminationP.rgb;
-                sumSpp += half(wIllumination) * sppP;
-                sum2ndMoment += half(wIllumination) * o2ndMomentP;
+                sumSpp += wIllumination * sppP;
+                sum2ndMoment += wIllumination * o2ndMomentP;
             }
             dxdy = -dxdy;
         }
         dxdy += gPattern;
     }
-    sum2ndMoment /= half(sumWIllumination);
+    sum2ndMoment /= sumWIllumination;
     float packedSppAndMoment = packSppAndMoment(sumSpp, sum2ndMoment);
 
     return float4(sumIllumination.rgb / sumWIllumination, packedSppAndMoment);
