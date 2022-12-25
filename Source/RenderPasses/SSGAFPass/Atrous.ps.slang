@@ -77,10 +77,10 @@ PS_OUT main(FullScreenPassVsOut vsOut) {
     // explicitly store/accumulate center pixel with weight 1 to prevent issues
     // with the edge-stopping functions
     float sumWIllumination = sppCenter;
-    float3 sumIllumination = illuminationCenter.rgb;
+    float3 sumIllumination = sppCenter * illuminationCenter.rgb;
     float sum2ndMoment = illuminationCenter.a;
     int2 dxdy = gPattern;
-    for (int step = 1; step <= 50; step++)
+    for (int step = 1; step <= 32; step++)
     {
         for (int i = 0; i < 2 ; i++)
         {
