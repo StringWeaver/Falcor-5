@@ -68,8 +68,11 @@ namespace
     // Internal buffer names
     const char kInternalBuffersPreviousLinearZ[] = "Previous Linear Z";
     const char kInternalBufferPreviousLighting[] = "Previous Lighting";
+    const char kInternalBufferPrevFrameValidSpp[] = "Previous Valid Spp";
+    const char kInternalBufferValidSpp0[] = "Valid Spp 0";
+    const char kInternalBufferValidSpp1[] = "Valid Spp 1";
     const char kInternalBufferHistoryLength0[] = "HistoryLength 0";
-    const char kInternalBufferHistoryLength1[] = "HistroyLength 1";
+    const char kInternalBufferHistoryLength1[] = "HistoryLength 1";
     const char kInternalBufferAtrousResult0[] = "Atrous Result 0";
     const char kInternalBufferAtrousResult1[] = "Atrous Result 1";
 
@@ -170,6 +173,15 @@ RenderPassReflection SSGAFPass::reflect(const CompileData& compileData)
     reflector.addInternal(kInternalBufferAtrousResult1, kInternalBufferAtrousResult1)
         .format(ResourceFormat::RGBA32Float)
         .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
+    reflector.addInternal(kInternalBufferPrevFrameValidSpp, kInternalBufferPrevFrameValidSpp)
+        .format(ResourceFormat::R32Float)
+        .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
+    reflector.addInternal(kInternalBufferValidSpp0, kInternalBufferValidSpp0)
+        .format(ResourceFormat::R32Float)
+        .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
+    reflector.addInternal(kInternalBufferValidSpp1, kInternalBufferValidSpp1)
+        .format(ResourceFormat::R32Float)
+        .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
     reflector.addInternal(kInternalBufferHistoryLength0, kInternalBufferHistoryLength0)
         .format(ResourceFormat::R16Float)
         .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
@@ -207,14 +219,18 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
     Texture::SharedPtr pLinearZTexture = renderData[kInputBufferLinearZ]->asTexture();
     Texture::SharedPtr pMotionVectorTexture = renderData[kInputBufferMotionVector]->asTexture();
     Texture::SharedPtr pPrevFrameIllumTexture = renderData[kInternalBufferPreviousLighting]->asTexture();
+    Texture::SharedPtr pPrevFrameValidSppTexture = renderData[kInternalBufferPrevFrameValidSpp]->asTexture();
     Texture::SharedPtr pPrevIterIllumTexture = renderData[kInternalBufferAtrousResult0]->asTexture();
     Texture::SharedPtr pCurrIterIllumTexture = renderData[kInternalBufferAtrousResult1]->asTexture();
+    Texture::SharedPtr pPrevIterValidSppTexture = renderData[kInternalBufferValidSpp0]->asTexture();
+    Texture::SharedPtr pCurrIterValidSppTexture = renderData[kInternalBufferValidSpp1]->asTexture();
     Texture::SharedPtr pPrevFrameLinearZTexture = renderData[kInternalBuffersPreviousLinearZ]->asTexture();
     Texture::SharedPtr pPrevHistoryLengthTexture;
     Texture::SharedPtr pHistoryLengthTexture;
     if (!mPrevFrameTextureIndex) {
         pPrevHistoryLengthTexture = renderData[kInternalBufferHistoryLength0]->asTexture();
         pHistoryLengthTexture = renderData[kInternalBufferHistoryLength1]->asTexture();
+        
     }
     else {
         pPrevHistoryLengthTexture = renderData[kInternalBufferHistoryLength1]->asTexture();
@@ -266,9 +282,11 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                     for (int j = 0; j < 2; j++) {
                         bool isLastPass = isLastIteration && !isReprojectIter && j == 1;
                         perImageCB["gIllumination"] = isFirstPass ? pIlluminationTexture : pPrevIterIllumTexture;
+                        perImageCB["gValidSpp"] = pPrevIterValidSppTexture;
                         perImageCB["gPattern"] = pattern << i;
                         pattern = int2(pattern.y, -pattern.x);
                         perImageCB["gIteration"] = i;
+                        perImageCB["gIsFirstPass"] = isFirstPass;
                         isFirstPass = false;
                         if (isLastPass) {
                             mpAtrousFbo->attachColorTarget(pOutputColorTexture, 0);
@@ -276,9 +294,11 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                         else {
                             mpAtrousFbo->attachColorTarget(pCurrIterIllumTexture, 0);
                         }
+                        mpAtrousFbo->attachColorTarget(pCurrIterValidSppTexture, 1);
 
                         mpAtrous->execute(pRenderContext, mpAtrousFbo);
                         std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
+                        std::swap(pCurrIterValidSppTexture,pPrevIterValidSppTexture);
                     }
                 }
 
@@ -293,15 +313,18 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                     // Setup textures for our reprojection shader pass
                     reprojPerImageCB["gMotion"] = pMotionVectorTexture;
                     reprojPerImageCB["gIllumination"] = isFirstPass ? pIlluminationTexture : pPrevIterIllumTexture;
+                    reprojPerImageCB["gValidSpp"] = pPrevIterValidSppTexture;
                     reprojPerImageCB["gReflectance"] = pReflectanceTexture;
                     reprojPerImageCB["gPrevIllum"] = pPrevFrameIllumTexture;
                     reprojPerImageCB["gPrevHistoryLength"] = pPrevHistoryLengthTexture;
+                    reprojPerImageCB["gPrevFrameValidSpp"] = pPrevFrameValidSppTexture;
                     reprojPerImageCB["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
                     reprojPerImageCB["gLinearZ"] = pLinearZTexture;
                     reprojPerImageCB["gPrevLinearZ"] = pPrevFrameLinearZTexture;
                     // Setup variables for our reprojection pass
                     reprojPerImageCB["gMaxHistoryLength"] = mMaxHistoryLength;
                     reprojPerImageCB["gPhiDepth"] = mPhiDepth;
+                    reprojPerImageCB["gIsFirstPass"] = isFirstPass;
                     isFirstPass = false;
                     if (isLastIteration) {
                         mpReprojFbo->attachColorTarget(pOutputColorTexture, 0);
@@ -309,9 +332,11 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                     else {
                         mpReprojFbo->attachColorTarget(pCurrIterIllumTexture, 0);
                     }
-                    mpReprojFbo->attachColorTarget(pHistoryLengthTexture, 1);
+                    mpReprojFbo->attachColorTarget(pCurrIterValidSppTexture,1);
+                    mpReprojFbo->attachColorTarget(pHistoryLengthTexture, 2);
                     mpReprojection->execute(pRenderContext, mpReprojFbo);
                     std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
+                    std::swap(pCurrIterValidSppTexture,pPrevIterValidSppTexture);
                 }
                 if (isFeedbackIter) {
                     if (isLastIteration) {
@@ -321,6 +346,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                     else {
                         pRenderContext->blit(pPrevIterIllumTexture->getSRV(), pPrevFrameIllumTexture->getRTV());
                     }
+                    pRenderContext->blit(pPrevIterValidSppTexture->getSRV(), pPrevFrameValidSppTexture->getRTV());
                 }
             }
 
@@ -331,6 +357,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
         auto perImageCB = mpFinalModulate["PerImageCB"];
         perImageCB["gDiffuseReflectance"] = pReflectanceTexture;
         perImageCB["gIllumination"] = pOutputColorTexture;
+        perImageCB["gValidSpp"] = pPrevIterValidSppTexture;
         perImageCB["gHistoryLength"] = pHistoryLengthTexture;
         perImageCB["gMaxHistoryLength"] = mMaxHistoryLength;
         perImageCB["gLinearZ"] = pLinearZTexture;
@@ -365,6 +392,9 @@ void SSGAFPass::clearBuffers(RenderContext* pRenderContext, const RenderData& re
     pRenderContext->clearTexture(renderData[kInternalBufferHistoryLength1]->asTexture().get());
     pRenderContext->clearTexture(renderData[kInternalBufferAtrousResult0]->asTexture().get());
     pRenderContext->clearTexture(renderData[kInternalBufferAtrousResult1]->asTexture().get());
+    pRenderContext->clearTexture(renderData[kInternalBufferValidSpp0]->asTexture().get());
+    pRenderContext->clearTexture(renderData[kInternalBufferValidSpp1]->asTexture().get());
+    pRenderContext->clearTexture(renderData[kInternalBufferPrevFrameValidSpp]->asTexture().get());
     pRenderContext->clearTexture(renderData[kOutputBufferDebugView0]->asTexture().get());
     pRenderContext->clearTexture(renderData[kOutputBufferDebugView1]->asTexture().get());
     pRenderContext->clearTexture(renderData[kOutputBufferDebugView2]->asTexture().get());

@@ -33,7 +33,8 @@ import Utils.Math.MathHelpers; //temporary for showing normal
 cbuffer PerImageCB
 {
     Texture2D   gDiffuseReflectance;
-    Texture2D   gIllumination;
+    Texture2D<float4> gIllumination;
+    Texture2D<float> gValidSpp;
     Texture2D gHistoryLength;
     Texture2D gLinearZ;
     Texture2D gNormalRoughnessMaterialID;
@@ -52,10 +53,8 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     const int2 ipos = int2(vsOut.posH.xy);
     const float zCenter = gLinearZ[ipos].x;
     const float3 nCenter = oct_to_ndir_unorm(gNormalRoughnessMaterialID[ipos].xy);
-    float spp, o2ndMoment;
-    unpackSppAndMoment(gIllumination[ipos].a, spp, o2ndMoment);
-    psOut.outDbgView0 = spp * gDbgViewScaleFactor;
-    psOut.outDbgView1 = o2ndMoment * gDbgViewScaleFactor;
+    psOut.outDbgView0 = gValidSpp[ipos] * gDbgViewScaleFactor;
+    psOut.outDbgView1 = gIllumination[ipos].a * gDbgViewScaleFactor;
     psOut.outDbgView2 = float4(nCenter, 0.f) * gDbgViewScaleFactor;
     return psOut;
 }

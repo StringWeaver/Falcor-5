@@ -68,7 +68,7 @@ struct ResolvePass
 
     static const bool kOutputGuideData = OUTPUT_GUIDE_DATA;
     static const bool kOutputNRDData = OUTPUT_NRD_DATA;
-    static const bool kSetRadianceAlphaToSpp = SET_RADIANCE_ALPHA_CHANNEL_TO_SPP;
+    static const bool kSetRadianceAlphaTo2ndMoment = SET_RADIANCE_ALPHA_CHANNEL_TO_2ND_MOMENT;
 
     /** Entry point for resolve pass.
         \param[in] pixel Pixel coordinates.
@@ -182,13 +182,12 @@ struct ResolvePass
                 hitDist += sampleNRDHitDist[idx];
             }
 
-            if (kSetRadianceAlphaToSpp) {
-                const float sppFloat = float(spp);
-                outputNRDDiffuseRadianceHitDist[pixel] = float4(invSpp * diffuseRadiance, packSppAndMoment(sppFloat, invSpp * specular2ndMoment));
-                outputNRDSpecularRadianceHitDist[pixel] = float4(invSpp * specularRadiance, packSppAndMoment(sppFloat, invSpp * specular2ndMoment));
-                outputNRDDeltaReflectionRadianceHitDist[pixel] = float4(invSpp * deltaReflectionRadiance, packSppAndMoment(sppFloat, invSpp * deltaReflection2ndMoment));
-                outputNRDDeltaTransmissionRadianceHitDist[pixel] = float4(invSpp * deltaTransmissionRadiance, packSppAndMoment(sppFloat, invSpp * deltaTransmission2ndMoment));
-                outputNRDResidualRadianceHitDist[pixel] = float4(invSpp * residualRadiance, packSppAndMoment(sppFloat, invSpp * residual2ndMoment ));
+            if (kSetRadianceAlphaTo2ndMoment) {
+                outputNRDDiffuseRadianceHitDist[pixel] = float4(invSpp * diffuseRadiance, diffuse2ndMoment);
+                outputNRDSpecularRadianceHitDist[pixel] = float4(invSpp * specularRadiance, specular2ndMoment);
+                outputNRDDeltaReflectionRadianceHitDist[pixel] = float4(invSpp * deltaReflectionRadiance, deltaReflection2ndMoment);
+                outputNRDDeltaTransmissionRadianceHitDist[pixel] = float4(invSpp * deltaTransmissionRadiance, deltaTransmission2ndMoment);
+                outputNRDResidualRadianceHitDist[pixel] = float4(invSpp * residualRadiance, residual2ndMoment);
             } else {
                 outputNRDDiffuseRadianceHitDist[pixel] = float4(invSpp * diffuseRadiance, invSpp * hitDist);
                 outputNRDSpecularRadianceHitDist[pixel] = float4(invSpp * specularRadiance, invSpp * hitDist);
