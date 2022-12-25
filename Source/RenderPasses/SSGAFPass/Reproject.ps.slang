@@ -133,7 +133,7 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     float weightHistory = prevIllumination.a;
     float weightCurrent = illumination.a;
     float sumWeight = weightHistory + weightCurrent;
-    psOut.OutIllumination =  float4((weightHistory * prevIllumination.rgb + weightCurrent * illumination.rgb) / sumWeight, prevIllumination.a + illumination.a) ;
+    psOut.OutIllumination =  float4((weightHistory * prevIllumination.rgb + weightCurrent * illumination.rgb) / sumWeight, sumWeight) ;
     psOut.OutHistoryLength = historyLength + 1.f;
     return psOut;
 }
