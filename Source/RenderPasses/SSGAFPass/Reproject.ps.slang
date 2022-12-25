@@ -127,12 +127,11 @@ PS_OUT main(FullScreenPassVsOut vsOut)
         historyLength = gMaxHistoryLength - 1.f;
     }
 
-
     // variance *= computeVarianceScale(16, 16, alpha);
-    
+
     // temporal integration of illumination
-    float weightHistory = historyLength;
-    float weightCurrent = 1.f;
+    float weightHistory = prevIllumination.a;
+    float weightCurrent = illumination.a;
     float sumWeight = weightHistory + weightCurrent;
     psOut.OutIllumination =  float4((weightHistory * prevIllumination.rgb + weightCurrent * illumination.rgb) / sumWeight, prevIllumination.a + illumination.a) ;
     psOut.OutHistoryLength = historyLength + 1.f;

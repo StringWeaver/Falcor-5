@@ -67,11 +67,10 @@ float4 main(FullScreenPassVsOut vsOut)
     }
     const float3 nCenter = oct_to_ndir_unorm(gNormalRoughnessMaterialID[ipos].xy);
 
-
     // explicitly store/accumulate center pixel with weight 1 to prevent issues
     // with the edge-stopping functions
-    float sumWIllumination = 1.0;
-    float4 sumIllumination = illuminationCenter;
+    float sumWIllumination = illuminationCenter.a;
+    float4 sumIllumination = sumWIllumination * illuminationCenter;
     int2 dxdy = gPattern;
     for (int step = 1; step <= 32; step++)
     {
@@ -93,7 +92,7 @@ float4 main(FullScreenPassVsOut vsOut)
                 } else {
                     phiLIllumination = gPhiColor;
                 }
-                const float wIllumination= computeWeight(step, 0, gPhiXY,zCenter, zP, gPhiDepth,nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
+                const float wIllumination= illuminationP.a * computeWeight(step, 0, gPhiXY,zCenter, zP, gPhiDepth,nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
                 //const float wIllumination = computeWeightBspline(step, gPhiXY, zCenter, zP, gPhiDepth, nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
                 sumWIllumination += wIllumination;
                 sumIllumination += wIllumination * illuminationP;
@@ -103,7 +102,7 @@ float4 main(FullScreenPassVsOut vsOut)
         dxdy += gPattern;
     }
 
-    return float4(sumIllumination.rgb / sumWIllumination, sumIllumination.a);
+    return float4(sumIllumination.rgb / sumWIllumination, sumWIllumination);
 
     
 }
