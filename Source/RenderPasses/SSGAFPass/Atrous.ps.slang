@@ -111,9 +111,8 @@ PS_OUT main(FullScreenPassVsOut vsOut) {
         }
         dxdy += gPattern;
     }
-    sum2ndMoment /= sumWIllumination;
 
-    psOut.OutIllumination = float4(sumIllumination.rgb / sumWIllumination, sum2ndMoment);
+    psOut.OutIllumination = float4(sumIllumination.rgb, sum2ndMoment) / sumWIllumination;
     psOut.OutValidSpp = sumWIllumination;
     return psOut;
 }

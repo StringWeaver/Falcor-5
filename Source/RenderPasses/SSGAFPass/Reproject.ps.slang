@@ -71,7 +71,7 @@ bool isReprjValid(int2 iposPrev,int2 ipos)
     return true;
 }
 
-bool loadPrevData(float2 posH, out float3 prevIllum, out float prev2ndMoment, out float prevValidSpp, out float historyLength)
+bool loadPrevData(float2 posH, out float4 prevIllum, out float prevValidSpp, out float historyLength)
 {
     const int2 ipos = posH;
     const float2 imageDim = float2(getTextureDims(gIllumination, 0));
@@ -81,16 +81,13 @@ bool loadPrevData(float2 posH, out float3 prevIllum, out float prev2ndMoment, ou
     const float2 posPrev = posH.xy + motion.xy * imageDim;
     const int2 iposPrev = int2(posPrev);
 
-    
-    if (isReprjValid(iposPrev,ipos)) {
-        prevIllum = gPrevIllum[iposPrev].rgb;
-        prev2ndMoment = gPrevIllum[iposPrev].a;
+    if (isReprjValid(iposPrev, ipos)) {
+        prevIllum = gPrevIllum[iposPrev];
         prevValidSpp = gPrevFrameValidSpp[iposPrev];
         historyLength = gPrevHistoryLength[iposPrev].x;
         return true;
     } else {
-        prevIllum = float3(0, 0, 0);
-        prev2ndMoment = 0.0f;
+        prevIllum = float4(0);
         prevValidSpp = 0.0f;
         historyLength = 0.0f;
         return false;
@@ -116,22 +113,21 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     const float4 posH = vsOut.posH;
     const int2 ipos = posH.xy;
     PS_OUT psOut;
-    float4 illumination = gIllumination[ipos];
+    float4 newIllumination = gIllumination[ipos];
     float newSpp = gIsFirstPass ? 1.f : gValidSpp[ipos];
-    float new2ndMoment = illumination.a;
+    float new2ndMoment = newIllumination.a;
     float historyLength;
     // Workaround path tracer bugs. TODO: remove this when we can.
-    if (isNaN(illumination.x) || isNaN(illumination.y) || isNaN(illumination.z))
+    if (isNaN(newIllumination.x) || isNaN(newIllumination.y) || isNaN(newIllumination.z))
     {
         psOut.OutIllumination = float4(0, 0, 0, 0);
         psOut.OutHistoryLength = 0.f;
         return psOut;
     }
 
-    float3 prevIllumination;
+    float4 prevIllumination;
     float oldSpp;
-    float old2ndMoment;
-    bool success = loadPrevData(posH.xy, prevIllumination, old2ndMoment, oldSpp, historyLength);
+    bool success = loadPrevData(posH.xy, prevIllumination, oldSpp, historyLength);
     const float eps = 1e-6;
     if (historyLength > gMaxHistoryLength - eps) { // historyLength >=  gMaxHistoryLength
         float temporalRetireFactor = (gMaxHistoryLength - 1.f) / historyLength;
@@ -142,9 +138,8 @@ PS_OUT main(FullScreenPassVsOut vsOut)
 
     // temporal integration of illumination
     float weightHistory = oldSpp / (newSpp + oldSpp);
-    new2ndMoment = lerp(new2ndMoment,old2ndMoment, weightHistory);
-    float3 newIllumination = lerp(illumination.rgb, prevIllumination.rgb, weightHistory);
-    psOut.OutIllumination = float4(newIllumination, new2ndMoment);
+    newIllumination = lerp(newIllumination, prevIllumination, weightHistory);
+    psOut.OutIllumination = newIllumination;
     psOut.OutValidSpp = newSpp + oldSpp;
     psOut.OutHistoryLength = historyLength + 1.f;
     return psOut;
