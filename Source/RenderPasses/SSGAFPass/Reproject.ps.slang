@@ -115,7 +115,6 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     PS_OUT psOut;
     float4 newIllumination = gIllumination[ipos];
     float newSpp = gIsFirstPass ? 1.f : gValidSpp[ipos];
-    float new2ndMoment = newIllumination.a;
     float historyLength;
     // Workaround path tracer bugs. TODO: remove this when we can.
     if (isNaN(newIllumination.x) || isNaN(newIllumination.y) || isNaN(newIllumination.z))
@@ -137,10 +136,10 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     // variance *= computeVarianceScale(16, 16, alpha);
 
     // temporal integration of illumination
-    float weightHistory = oldSpp / (newSpp + oldSpp);
-    newIllumination = lerp(newIllumination, prevIllumination, weightHistory);
+    float sumSpp = oldSpp + newSpp;
+    newIllumination =  (newSpp * newIllumination +  oldSpp * prevIllumination) / sumSpp;
     psOut.OutIllumination = newIllumination;
-    psOut.OutValidSpp = newSpp + oldSpp;
+    psOut.OutValidSpp = sumSpp;
     psOut.OutHistoryLength = historyLength + 1.f;
     return psOut;
 }

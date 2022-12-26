@@ -77,8 +77,7 @@ PS_OUT main(FullScreenPassVsOut vsOut) {
     // explicitly store/accumulate center pixel with weight 1 to prevent issues
     // with the edge-stopping functions
     float sumWIllumination = sppCenter;
-    float3 sumIllumination = sppCenter * illuminationCenter.rgb;
-    float sum2ndMoment = illuminationCenter.a;
+    float4 sumIllumination = sppCenter * illuminationCenter;
     int2 dxdy = gPattern;
     for (int step = 1; step <= 32; step++)
     {
@@ -93,7 +92,6 @@ PS_OUT main(FullScreenPassVsOut vsOut) {
                 const float zP = gLinearZ[p].x;
                 const float3 nP = oct_to_ndir_unorm(gNormalRoughnessMaterialID[p].xy);
                 float sppP = gIsFirstPass ? 1.f : gValidSpp[p];
-                float o2ndMomentP = illuminationP.a;
                 // compute the edge-stopping functions
                 float phiLIllumination;
                 if (sppCenter < gIgnorePhiColorSampleCountThreshold || sppP < gIgnorePhiColorSampleCountThreshold) {
@@ -104,15 +102,14 @@ PS_OUT main(FullScreenPassVsOut vsOut) {
                 const float wIllumination= sppP * computeWeight(step, 0, gPhiXY,zCenter, zP, gPhiDepth,nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
                 //const float wIllumination = computeWeightBspline(step, gPhiXY, zCenter, zP, gPhiDepth, nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
                 sumWIllumination += wIllumination;
-                sumIllumination += wIllumination * illuminationP.rgb;
-                sum2ndMoment += wIllumination * o2ndMomentP;
+                sumIllumination += wIllumination * illuminationP;
             }
             dxdy = -dxdy;
         }
         dxdy += gPattern;
     }
 
-    psOut.OutIllumination = float4(sumIllumination.rgb, sum2ndMoment) / sumWIllumination;
+    psOut.OutIllumination = sumIllumination / sumWIllumination;
     psOut.OutValidSpp = sumWIllumination;
     return psOut;
 }
