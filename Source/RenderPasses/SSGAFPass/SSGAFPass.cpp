@@ -37,49 +37,46 @@ TODO:
 
 const RenderPass::Info SSGAFPass::kInfo { "SSGAFPass", "SSGAF denoising pass for individual path type components." };
 
-namespace
-{
-    // Shader source files
-    const char kPackLinearZAndNormalShader[] = "RenderPasses/SSGAFPass/PackLinearZAndNormal.ps.slang";
-    const char kReprojectShader[]            = "RenderPasses/SSGAFPass/Reproject.ps.slang";
-    const char kAtrousShader[]               = "RenderPasses/SSGAFPass/Atrous.ps.slang";
-    const char kFinalModulateShader[]        = "RenderPasses/SSGAFPass/FinalModulate.ps.slang";
+namespace {
+// Shader source files
+const char kPackLinearZAndNormalShader[] = "RenderPasses/SSGAFPass/PackLinearZAndNormal.ps.slang";
+const char kReprojectShader[] = "RenderPasses/SSGAFPass/Reproject.ps.slang";
+const char kAtrousShader[] = "RenderPasses/SSGAFPass/Atrous.ps.slang";
+const char kFinalModulateShader[] = "RenderPasses/SSGAFPass/FinalModulate.ps.slang";
 
-    // Names of valid entries in the parameter dictionary.
-    const char kEnabled[] = "Enabled";
-    const char kIterations[] = "Iterations";
-    const char kFeedbackIteration[] = "FeedbackIteration";
-    const char kReprojectIteration[] = "ReprojectIteration";
-    const char kVarianceEpsilon[] = "VarianceEpsilon";
-    const char kPhiXY[] = "PhiXY";
-    const char kPhiDepth[] = "PhiDepth";
-    const char kPhiColor[] = "PhiColor";
-    const char kIgnorePhiColorSampleCountThreshold[] = "IgnorePhiColorSampleCountThreshold";
-    const char kPhiNormal[] = "PhiNormal";
-    const char kMaxHistoryLength[] = "MaxHistoryLength";
+// Names of valid entries in the parameter dictionary.
+const char kEnabled[] = "Enabled";
+const char kIterations[] = "Iterations";
+const char kFeedbackIteration[] = "FeedbackIteration";
+const char kReprojectIteration[] = "ReprojectIteration";
+const char kVarianceEpsilon[] = "VarianceEpsilon";
+const char kPhiXY[] = "PhiXY";
+const char kPhiDepth[] = "PhiDepth";
+const char kPhiColor[] = "PhiColor";
+const char kIgnorePhiColorSampleCountThreshold[] = "IgnorePhiColorSampleCountThreshold";
+const char kPhiNormal[] = "PhiNormal";
+const char kMaxHistoryLength[] = "MaxHistoryLength";
 
-    // Input buffer names
-    const char kInputBufferIllumination[] = "Illumination";
-    const char kInputNormalRoughnessMaterialID[] = "normWRoughnessMaterialID";
-    const char kInputBufferLinearZ[] = "LinearZ";
-    const char kInputBufferMotionVector[] = "MotionVec";
+// Input buffer names
+const char kInputBufferIllumination[] = "Illumination";
+const char kInputNormalRoughnessMaterialID[] = "normWRoughnessMaterialID";
+const char kInputBufferLinearZ[] = "LinearZ";
+const char kInputBufferMotionVector[] = "MotionVec";
 
-    // Internal buffer names
-    const char kInternalBuffersPreviousLinearZ[] = "Previous Linear Z";
-    const char kInternalBufferPreviousLighting[] = "Previous Lighting";
-    const char kInternalBufferPrevFrameValidSpp[] = "Previous Valid Spp";
-    const char kInternalBufferValidSpp0[] = "Valid Spp 0";
-    const char kInternalBufferValidSpp1[] = "Valid Spp 1";
-    const char kInternalBufferHistoryLength0[] = "HistoryLength 0";
-    const char kInternalBufferHistoryLength1[] = "HistoryLength 1";
-    const char kInternalBufferAtrousResult0[] = "Atrous Result 0";
-    const char kInternalBufferAtrousResult1[] = "Atrous Result 1";
+// Internal buffer names
+const char kInternalBuffersPreviousLinearZ[] = "Previous Linear Z";
+const char kInternalBufferPreviousLighting[] = "Previous Lighting";
+const char kInternalBufferPrevFrameValidSpp[] = "Previous Valid Spp";
+const char kInternalBufferValidSpp0[] = "Valid Spp 0";
+const char kInternalBufferValidSpp1[] = "Valid Spp 1";
+const char kInternalBufferHistoryLength0[] = "HistoryLength 0";
+const char kInternalBufferHistoryLength1[] = "HistoryLength 1";
 
-    // Output buffer name
-    const char kOutputBufferFilteredImage[] = "Filtered image";
-    const char kOutputBufferDebugView0[] = "Debug View 0";
-    const char  kOutputBufferDebugView1[] = "Debug View 1";
-    const char  kOutputBufferDebugView2[] = "Debug View 2";
+// Output buffer name
+const char kOutputBufferFilteredImage[] = "Filtered image";
+const char kOutputBufferDebugView0[] = "Debug View 0";
+const char kOutputBufferDebugView1[] = "Debug View 1";
+const char kOutputBufferDebugView2[] = "Debug View 2";
 }
 
 // Don't remove this. it's required for hot-reload to function properly
@@ -101,19 +98,29 @@ SSGAFPass::SharedPtr SSGAFPass::create(RenderContext* pRenderContext, const Dict
 SSGAFPass::SSGAFPass(const Dictionary& dict)
     : RenderPass(kInfo)
 {
-    for (const auto& [key, value] : dict)
-    {
-        if (key == kEnabled) mFilterEnabled = value;
-        else if (key == kIterations) mFilterIterations = value;
-        else if (key == kFeedbackIteration) mFeedbackIteration = value;
-        else if (key == kReprojectIteration) mReprojectIteration = value;
-        else if (key == kPhiXY) mPhiXY = value;
-        else if (key == kPhiDepth) mPhiDepth = value;
-        else if (key == kPhiColor) mPhiColor = value;
-        else if (key == kIgnorePhiColorSampleCountThreshold) mIgnorePhiColorSampleCountThreshold = value;
-        else if (key == kPhiNormal) mPhiNormal = value;
-        else if (key == kMaxHistoryLength) mMaxHistoryLength = value;
-        else logWarning("Unknown field '{}' in SSGAFPass dictionary.", key);
+    for (const auto& [key, value] : dict) {
+        if (key == kEnabled)
+            mFilterEnabled = value;
+        else if (key == kIterations)
+            mFilterIterations = value;
+        else if (key == kFeedbackIteration)
+            mFeedbackIteration = value;
+        else if (key == kReprojectIteration)
+            mReprojectIteration = value;
+        else if (key == kPhiXY)
+            mPhiXY = value;
+        else if (key == kPhiDepth)
+            mPhiDepth = value;
+        else if (key == kPhiColor)
+            mPhiColor = value;
+        else if (key == kIgnorePhiColorSampleCountThreshold)
+            mIgnorePhiColorSampleCountThreshold = value;
+        else if (key == kPhiNormal)
+            mPhiNormal = value;
+        else if (key == kMaxHistoryLength)
+            mMaxHistoryLength = value;
+        else
+            logWarning("Unknown field '{}' in SSGAFPass dictionary.", key);
     }
 
     mpReprojection = FullScreenPass::create(kReprojectShader);
@@ -165,12 +172,6 @@ RenderPassReflection SSGAFPass::reflect(const CompileData& compileData)
     reflector.addInternal(kInternalBufferPreviousLighting, "Previous Filtered Lighting")
         .format(ResourceFormat::RGBA32Float)
         .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
-    reflector.addInternal(kInternalBufferAtrousResult0, kInternalBufferAtrousResult0)
-        .format(ResourceFormat::RGBA32Float)
-        .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
-    reflector.addInternal(kInternalBufferAtrousResult1, kInternalBufferAtrousResult1)
-        .format(ResourceFormat::RGBA32Float)
-        .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
     reflector.addInternal(kInternalBufferPrevFrameValidSpp, kInternalBufferPrevFrameValidSpp)
         .format(ResourceFormat::R32Float)
         .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
@@ -217,162 +218,137 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
     Texture::SharedPtr pMotionVectorTexture = renderData[kInputBufferMotionVector]->asTexture();
     Texture::SharedPtr pPrevFrameIllumTexture = renderData[kInternalBufferPreviousLighting]->asTexture();
     Texture::SharedPtr pPrevFrameValidSppTexture = renderData[kInternalBufferPrevFrameValidSpp]->asTexture();
-    Texture::SharedPtr pPrevIterIllumTexture = renderData[kInternalBufferAtrousResult0]->asTexture();
-    Texture::SharedPtr pCurrIterIllumTexture = renderData[kInternalBufferAtrousResult1]->asTexture();
-    Texture::SharedPtr pPrevIterValidSppTexture = renderData[kInternalBufferValidSpp0]->asTexture();
-    Texture::SharedPtr pCurrIterValidSppTexture = renderData[kInternalBufferValidSpp1]->asTexture();
     Texture::SharedPtr pPrevFrameLinearZTexture = renderData[kInternalBuffersPreviousLinearZ]->asTexture();
     Texture::SharedPtr pPrevHistoryLengthTexture;
     Texture::SharedPtr pHistoryLengthTexture;
     if (!mPrevFrameTextureIndex) {
         pPrevHistoryLengthTexture = renderData[kInternalBufferHistoryLength0]->asTexture();
         pHistoryLengthTexture = renderData[kInternalBufferHistoryLength1]->asTexture();
-        
-    }
-    else {
+
+    } else {
         pPrevHistoryLengthTexture = renderData[kInternalBufferHistoryLength1]->asTexture();
         pHistoryLengthTexture = renderData[kInternalBufferHistoryLength0]->asTexture();
     }
-
 
     Texture::SharedPtr pOutputColorTexture = renderData[kOutputBufferFilteredImage]->asTexture();
     Texture::SharedPtr pOutputDebugView0Texture = renderData[kOutputBufferDebugView0]->asTexture();
     Texture::SharedPtr pOutputDebugView1Texture = renderData[kOutputBufferDebugView1]->asTexture();
     Texture::SharedPtr pOutputDebugView2Texture = renderData[kOutputBufferDebugView2]->asTexture();
 
+    Texture::SharedPtr pPrevIterIllumTexture = pIlluminationTexture;
+    Texture::SharedPtr pCurrIterIllumTexture = pOutputColorTexture;
+    Texture::SharedPtr pPrevIterValidSppTexture = renderData[kInternalBufferValidSpp0]->asTexture();
+    Texture::SharedPtr pCurrIterValidSppTexture = renderData[kInternalBufferValidSpp1]->asTexture();
 
-    if (mBuffersNeedClear)
-    {
+    if (mBuffersNeedClear) {
         clearBuffers(pRenderContext, renderData);
         mBuffersNeedClear = false;
     }
 
-    if (mFilterEnabled)
-    {
+    if (mFilterEnabled) {
         // Filter illumination from pPrevIterIllumTexture, storing the result
         // in pCurrIterIllumTexture.  Along the way (or at the end, depending on
         // the value of mFeedbackIteration), save the filtered illumination for
         // next time into mpFilteredPastFbo.
-        {
-            auto perImageCB = mpAtrous["PerImageCB"];
-            perImageCB["gLinearZ"] = pLinearZTexture;
-            perImageCB["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
-            perImageCB["gPhiXY"] = mPhiXY;
-            perImageCB["gPhiColor"] = mPhiColor;
-            perImageCB["gPhiNormal"] = mPhiNormal;
-            perImageCB["gPhiDepth"] = mPhiDepth;
-            perImageCB["gIgnorePhiColorSampleCountThreshold"] = mIgnorePhiColorSampleCountThreshold;
 
-            bool isFirstPass = true;
-            //const std::array<const int2, 4> patternSequence = { int2(0,1), int2(1,1), int2(0,1), int2(-1,1) };
-            //mPatternSequenceIndex = (mPatternSequenceIndex + 1) % patternSequence.size();
-            int2 pattern = int2(0, 1);
-            for (int i = -1; i < mFilterIterations; i++)
-            {
-                bool isLastIteration = (i == mFilterIterations - 1);
-                bool isReprojectIter = (i == std::min(mReprojectIteration - 1, mFilterIterations - 1));
-                bool isFeedbackIter = (i == std::min(mFeedbackIteration - 1, mFilterIterations - 1));
-                
-                // Spatial Accumulation
-                if (i >= 0) {
-                    for (int j = 0; j < 2; j++) {
-                        bool isLastPass = isLastIteration && !isReprojectIter && j == 1;
-                        perImageCB["gIllumination"] = isFirstPass ? pIlluminationTexture : pPrevIterIllumTexture;
-                        perImageCB["gValidSpp"] = pPrevIterValidSppTexture;
-                        perImageCB["gPattern"] = pattern << i;
-                        pattern = int2(pattern.y, -pattern.x);
-                        perImageCB["gIteration"] = i;
-                        perImageCB["gIsFirstPass"] = isFirstPass;
-                        isFirstPass = false;
-                        if (isLastPass) {
-                            mpAtrousFbo->attachColorTarget(pOutputColorTexture, 0);
-                        }
-                        else {
-                            mpAtrousFbo->attachColorTarget(pCurrIterIllumTexture, 0);
-                        }
-                        mpAtrousFbo->attachColorTarget(pCurrIterValidSppTexture, 1);
+        auto spatialPassVars = mpAtrous["PerImageCB"];
+        spatialPassVars["gLinearZ"] = pLinearZTexture;
+        spatialPassVars["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
+        spatialPassVars["gPhiXY"] = mPhiXY;
+        spatialPassVars["gPhiColor"] = mPhiColor;
+        spatialPassVars["gPhiNormal"] = mPhiNormal;
+        spatialPassVars["gPhiDepth"] = mPhiDepth;
+        spatialPassVars["gIgnorePhiColorSampleCountThreshold"] = mIgnorePhiColorSampleCountThreshold;
 
-                        mpAtrous->execute(pRenderContext, mpAtrousFbo);
-                        std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
-                        std::swap(pCurrIterValidSppTexture,pPrevIterValidSppTexture);
-                    }
-                }
+        bool isFirstPass = true;
+        // const std::array<const int2, 4> patternSequence = { int2(0,1), int2(1,1), int2(0,1), int2(-1,1) };
+        // mPatternSequenceIndex = (mPatternSequenceIndex + 1) % patternSequence.size();
+        int2 pattern = int2(0, 1);
+        for (int i = -1; i < mFilterIterations; i++) {
+            bool isLastIteration = (i == mFilterIterations - 1);
+            bool isReprojectIter = (i == std::min(mReprojectIteration - 1, mFilterIterations - 1));
+            bool isFeedbackIter = (i == std::min(mFeedbackIteration - 1, mFilterIterations - 1));
 
-                // store the filtered color for the feedback path
-                // get illumination and lerp in
-                // reprojected filtered illumination from the previous frame.
-                // Stores the result as well as initial moments and an updated
-                // per-pixel history length in mpReprojFbo.
-                if (isReprojectIter)
-                {
-                    auto reprojPerImageCB = mpReprojection["PerImageCB"];
-                    // Setup textures for our reprojection shader pass
-                    reprojPerImageCB["gMotion"] = pMotionVectorTexture;
-                    reprojPerImageCB["gIllumination"] = isFirstPass ? pIlluminationTexture : pPrevIterIllumTexture;
-                    reprojPerImageCB["gValidSpp"] = pPrevIterValidSppTexture;
-                    reprojPerImageCB["gPrevIllum"] = pPrevFrameIllumTexture;
-                    reprojPerImageCB["gPrevHistoryLength"] = pPrevHistoryLengthTexture;
-                    reprojPerImageCB["gPrevFrameValidSpp"] = pPrevFrameValidSppTexture;
-                    reprojPerImageCB["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
-                    reprojPerImageCB["gLinearZ"] = pLinearZTexture;
-                    reprojPerImageCB["gPrevLinearZ"] = pPrevFrameLinearZTexture;
-                    // Setup variables for our reprojection pass
-                    reprojPerImageCB["gMaxHistoryLength"] = mMaxHistoryLength;
-                    reprojPerImageCB["gPhiDepth"] = mPhiDepth;
-                    reprojPerImageCB["gIsFirstPass"] = isFirstPass;
+            // Spatial Accumulation
+            if (i >= 0) {
+                for (int j = 0; j < 2; j++) {
+                    bool isLastPass = isLastIteration && !isReprojectIter && j == 1;
+                    spatialPassVars["gIllumination"] = pPrevIterIllumTexture;
+                    spatialPassVars["gValidSpp"] = pPrevIterValidSppTexture;
+                    spatialPassVars["gPattern"] = pattern << i;
+                    pattern = int2(pattern.y, -pattern.x);
+                    spatialPassVars["gIteration"] = i;
+                    spatialPassVars["gIsFirstPass"] = isFirstPass;
                     isFirstPass = false;
-                    if (isLastIteration) {
-                        mpReprojFbo->attachColorTarget(pOutputColorTexture, 0);
-                    }
-                    else {
-                        mpReprojFbo->attachColorTarget(pCurrIterIllumTexture, 0);
-                    }
-                    mpReprojFbo->attachColorTarget(pCurrIterValidSppTexture,1);
-                    mpReprojFbo->attachColorTarget(pHistoryLengthTexture, 2);
-                    mpReprojection->execute(pRenderContext, mpReprojFbo);
+                    mpAtrousFbo->attachColorTarget(pCurrIterIllumTexture, 0);
+                    mpAtrousFbo->attachColorTarget(pCurrIterValidSppTexture, 1);
+
+                    mpAtrous->execute(pRenderContext, mpAtrousFbo);
                     std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
-                    std::swap(pCurrIterValidSppTexture,pPrevIterValidSppTexture);
-                }
-                if (isFeedbackIter) {
-                    if (isLastIteration) {
-                        pRenderContext->blit(pOutputColorTexture->getSRV(), pPrevFrameIllumTexture->getRTV());
-                    }
-                    else {
-                        pRenderContext->blit(pPrevIterIllumTexture->getSRV(), pPrevFrameIllumTexture->getRTV());
-                    }
-                    pRenderContext->blit(pPrevIterValidSppTexture->getSRV(), pPrevFrameValidSppTexture->getRTV());
+                    std::swap(pCurrIterValidSppTexture, pPrevIterValidSppTexture);
                 }
             }
 
-            
+            // store the filtered color for the feedback path
+            // get illumination and lerp in
+            // reprojected filtered illumination from the previous frame.
+            // Stores the result as well as initial moments and an updated
+            // per-pixel history length in mpReprojFbo.
+            if (isReprojectIter) {
+                auto reprojPassVars = mpReprojection["PerImageCB"];
+                // Setup textures for our reprojection shader pass
+                reprojPassVars["gMotion"] = pMotionVectorTexture;
+                reprojPassVars["gIllumination"] = pPrevIterIllumTexture;
+                reprojPassVars["gValidSpp"] = pPrevIterValidSppTexture;
+                reprojPassVars["gPrevIllum"] = pPrevFrameIllumTexture;
+                reprojPassVars["gPrevHistoryLength"] = pPrevHistoryLengthTexture;
+                reprojPassVars["gPrevFrameValidSpp"] = pPrevFrameValidSppTexture;
+                reprojPassVars["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
+                reprojPassVars["gLinearZ"] = pLinearZTexture;
+                reprojPassVars["gPrevLinearZ"] = pPrevFrameLinearZTexture;
+                // Setup variables for our reprojection pass
+                reprojPassVars["gMaxHistoryLength"] = mMaxHistoryLength;
+                reprojPassVars["gPhiDepth"] = mPhiDepth;
+                reprojPassVars["gIsFirstPass"] = isFirstPass;
+                isFirstPass = false;
+                mpReprojFbo->attachColorTarget(pCurrIterIllumTexture, 0);
+                mpReprojFbo->attachColorTarget(pCurrIterValidSppTexture, 1);
+                mpReprojFbo->attachColorTarget(pHistoryLengthTexture, 2);
+                mpReprojection->execute(pRenderContext, mpReprojFbo);
+                std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
+                std::swap(pCurrIterValidSppTexture, pPrevIterValidSppTexture);
+            }
+            if (isFeedbackIter) {
+                pRenderContext->blit(pPrevIterIllumTexture->getSRV(), pPrevFrameIllumTexture->getRTV());
+                pRenderContext->blit(pPrevIterValidSppTexture->getSRV(), pPrevFrameValidSppTexture->getRTV());
+            }
         }
 
         // Compute albedo * filtered illumination and add emission back in.
-        auto perImageCB = mpFinalModulate["PerImageCB"];
-        perImageCB["gIllumination"] = pOutputColorTexture;
-        perImageCB["gValidSpp"] = pPrevIterValidSppTexture;
-        perImageCB["gHistoryLength"] = pHistoryLengthTexture;
-        perImageCB["gMaxHistoryLength"] = mMaxHistoryLength;
-        perImageCB["gLinearZ"] = pLinearZTexture;
-        perImageCB["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
-        perImageCB["gDbgViewScaleFactor"] = mDbgViewScaleFactor;
+        auto finalPassVars = mpFinalModulate["PerImageCB"];
+        finalPassVars["gIllumination"] = pOutputColorTexture;
+        finalPassVars["gValidSpp"] = pPrevIterValidSppTexture;
+        finalPassVars["gHistoryLength"] = pHistoryLengthTexture;
+        finalPassVars["gMaxHistoryLength"] = mMaxHistoryLength;
+        finalPassVars["gLinearZ"] = pLinearZTexture;
+        finalPassVars["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
+        finalPassVars["gDbgViewScaleFactor"] = mDbgViewScaleFactor;
         mpFinalFbo->attachColorTarget(pOutputDebugView0Texture, 0);
         mpFinalFbo->attachColorTarget(pOutputDebugView1Texture, 1);
         mpFinalFbo->attachColorTarget(pOutputDebugView2Texture, 2);
         mpFinalModulate->execute(pRenderContext, mpFinalFbo);
 
+        if (pPrevIterIllumTexture != pOutputColorTexture) {
+            pRenderContext->blit(pPrevIterIllumTexture->getSRV(), pOutputColorTexture->getRTV());
+        }
 
         // Swap resources so we're ready for next frame.
         mPrevFrameTextureIndex = !mPrevFrameTextureIndex;
         pRenderContext->blit(pLinearZTexture->getSRV(), pPrevFrameLinearZTexture->getRTV());
-    }
-    else
-    {
+    } else {
         pRenderContext->blit(pIlluminationTexture->getSRV(), pOutputColorTexture->getRTV());
     }
 }
-
-
 
 void SSGAFPass::clearBuffers(RenderContext* pRenderContext, const RenderData& renderData)
 {
@@ -383,15 +359,12 @@ void SSGAFPass::clearBuffers(RenderContext* pRenderContext, const RenderData& re
     pRenderContext->clearTexture(renderData[kInternalBufferPreviousLighting]->asTexture().get());
     pRenderContext->clearTexture(renderData[kInternalBufferHistoryLength0]->asTexture().get());
     pRenderContext->clearTexture(renderData[kInternalBufferHistoryLength1]->asTexture().get());
-    pRenderContext->clearTexture(renderData[kInternalBufferAtrousResult0]->asTexture().get());
-    pRenderContext->clearTexture(renderData[kInternalBufferAtrousResult1]->asTexture().get());
     pRenderContext->clearTexture(renderData[kInternalBufferValidSpp0]->asTexture().get());
     pRenderContext->clearTexture(renderData[kInternalBufferValidSpp1]->asTexture().get());
     pRenderContext->clearTexture(renderData[kInternalBufferPrevFrameValidSpp]->asTexture().get());
     pRenderContext->clearTexture(renderData[kOutputBufferDebugView0]->asTexture().get());
     pRenderContext->clearTexture(renderData[kOutputBufferDebugView1]->asTexture().get());
     pRenderContext->clearTexture(renderData[kOutputBufferDebugView2]->asTexture().get());
-    
 }
 
 // Extracts linear z and its derivative from the linear Z texture and packs
@@ -399,7 +372,6 @@ void SSGAFPass::clearBuffers(RenderContext* pRenderContext, const RenderData& re
 // (It's slightly wasteful to copy linear z here, but having this all
 // together in a single buffer is a small simplification, since we make a
 // copy of it to refer to in the next frame.)
-
 
 void SSGAFPass::renderUI(Gui::Widgets& widget)
 {
@@ -421,7 +393,6 @@ void SSGAFPass::renderUI(Gui::Widgets& widget)
     dirty |= (int)widget.var("For Normal", mPhiNormal, 0.001f, 1000.0f, 0.2f);
     dirty |= (int)widget.var("For Depth", mPhiDepth, 0.001f, 100.0f);
 
-    
     widget.text("");
     widget.text("How much history should be used?");
     widget.text("    (MaxHistoryLength;  1 = no reuse)");
@@ -431,7 +402,6 @@ void SSGAFPass::renderUI(Gui::Widgets& widget)
     widget.text("Control Debug View");
     dirty |= (int)widget.var("Scale Factor", mDbgViewScaleFactor, 0.f, 32.0f);
 
-    
-
-    if (dirty) mBuffersNeedClear = true;
+    if (dirty)
+        mBuffersNeedClear = true;
 }
