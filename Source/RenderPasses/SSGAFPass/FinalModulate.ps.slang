@@ -53,8 +53,11 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     const int2 ipos = int2(vsOut.posH.xy);
     const float zCenter = gLinearZ[ipos].x;
     const float3 nCenter = oct_to_ndir_unorm(gNormalRoughnessMaterialID[ipos].xy);
+    float o1stMoment = luminance(gIllumination[ipos].rgb);
+    float variance = gIllumination[ipos].a - o1stMoment * o1stMoment;
+    float noiseLevel = sqrt(variance / gValidSpp[ipos])/(o1stMoment + 0.1f);
     psOut.outDbgView0 = gValidSpp[ipos] * gDbgViewScaleFactor;
     psOut.outDbgView1 = gIllumination[ipos].a * gDbgViewScaleFactor;
-    psOut.outDbgView2 = float4(nCenter, 0.f) * gDbgViewScaleFactor;
+    psOut.outDbgView2 = float4(noiseLevel) * gDbgViewScaleFactor;
     return psOut;
 }

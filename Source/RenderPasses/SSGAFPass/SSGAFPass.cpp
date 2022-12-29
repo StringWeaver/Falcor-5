@@ -342,7 +342,6 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                     if (isLastIteration) {
                         pRenderContext->blit(pOutputColorTexture->getSRV(), pPrevFrameIllumTexture->getRTV());
                     }
-
                     else {
                         pRenderContext->blit(pPrevIterIllumTexture->getSRV(), pPrevFrameIllumTexture->getRTV());
                     }

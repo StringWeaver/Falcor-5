@@ -76,9 +76,8 @@ PS_OUT main(FullScreenPassVsOut vsOut) {
 
     // explicitly store/accumulate center pixel with weight 1 to prevent issues
     // with the edge-stopping functions
-    float sumWIllumination = 1;
-    float4 sumIllumination = illuminationCenter;
-    float sumSpp = sppCenter;
+    float sumWIllumination = sppCenter;
+    float4 sumIllumination =  sppCenter * illuminationCenter;
     int2 dxdy = gPattern;
     for (int step = 1; step <= 32; step++)
     {
@@ -100,11 +99,10 @@ PS_OUT main(FullScreenPassVsOut vsOut) {
                 } else {
                     phiLIllumination = gPhiColor;
                 }
-                const float wIllumination = computeWeight(step, 0, gPhiXY,zCenter, zP, gPhiDepth,nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
+                const float wIllumination = sppP * computeWeight(step, 0, gPhiXY,zCenter, zP, gPhiDepth,nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
                 //const float wIllumination = computeWeightBspline(step, gPhiXY, zCenter, zP, gPhiDepth, nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
                 sumWIllumination += wIllumination;
                 sumIllumination += wIllumination * illuminationP;
-                sumSpp += wIllumination * sppP;
             }
             dxdy = -dxdy;
         }
@@ -112,6 +110,6 @@ PS_OUT main(FullScreenPassVsOut vsOut) {
     }
 
     psOut.OutIllumination = sumIllumination / sumWIllumination;
-    psOut.OutValidSpp = sumSpp;
+    psOut.OutValidSpp = sumWIllumination;
     return psOut;
 }
