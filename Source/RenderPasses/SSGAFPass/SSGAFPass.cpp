@@ -59,7 +59,6 @@ namespace
     const char kMaxHistoryLength[] = "MaxHistoryLength";
 
     // Input buffer names
-    const char kInputBufferReflectance[] = "Reflectance";
     const char kInputBufferIllumination[] = "Illumination";
     const char kInputNormalRoughnessMaterialID[] = "normWRoughnessMaterialID";
     const char kInputBufferLinearZ[] = "LinearZ";
@@ -155,7 +154,6 @@ RenderPassReflection SSGAFPass::reflect(const CompileData& compileData)
 {
     RenderPassReflection reflector;
 
-    reflector.addInput(kInputBufferReflectance, "Reflectance");
     reflector.addInput(kInputBufferIllumination, "Radiance");
     reflector.addInput(kInputNormalRoughnessMaterialID, "World normal, roughness, and material ID");
     reflector.addInput(kInputBufferLinearZ, "LinearZ");
@@ -213,7 +211,6 @@ void SSGAFPass::compile(RenderContext* pRenderContext, const CompileData& compil
 
 void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderData)
 {
-    Texture::SharedPtr pReflectanceTexture = renderData[kInputBufferReflectance]->asTexture();
     Texture::SharedPtr pIlluminationTexture = renderData[kInputBufferIllumination]->asTexture();
     Texture::SharedPtr pNormalRoughnessMaterialIDTexture = renderData[kInputNormalRoughnessMaterialID]->asTexture();
     Texture::SharedPtr pLinearZTexture = renderData[kInputBufferLinearZ]->asTexture();
@@ -260,7 +257,6 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
             auto perImageCB = mpAtrous["PerImageCB"];
             perImageCB["gLinearZ"] = pLinearZTexture;
             perImageCB["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
-            perImageCB["gReflectance"] = pReflectanceTexture;
             perImageCB["gPhiXY"] = mPhiXY;
             perImageCB["gPhiColor"] = mPhiColor;
             perImageCB["gPhiNormal"] = mPhiNormal;
@@ -314,7 +310,6 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                     reprojPerImageCB["gMotion"] = pMotionVectorTexture;
                     reprojPerImageCB["gIllumination"] = isFirstPass ? pIlluminationTexture : pPrevIterIllumTexture;
                     reprojPerImageCB["gValidSpp"] = pPrevIterValidSppTexture;
-                    reprojPerImageCB["gReflectance"] = pReflectanceTexture;
                     reprojPerImageCB["gPrevIllum"] = pPrevFrameIllumTexture;
                     reprojPerImageCB["gPrevHistoryLength"] = pPrevHistoryLengthTexture;
                     reprojPerImageCB["gPrevFrameValidSpp"] = pPrevFrameValidSppTexture;
@@ -354,7 +349,6 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
 
         // Compute albedo * filtered illumination and add emission back in.
         auto perImageCB = mpFinalModulate["PerImageCB"];
-        perImageCB["gDiffuseReflectance"] = pReflectanceTexture;
         perImageCB["gIllumination"] = pOutputColorTexture;
         perImageCB["gValidSpp"] = pPrevIterValidSppTexture;
         perImageCB["gHistoryLength"] = pHistoryLengthTexture;

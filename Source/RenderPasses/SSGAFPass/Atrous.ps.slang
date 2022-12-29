@@ -35,7 +35,6 @@ cbuffer PerImageCB
 {
     Texture2D<float4> gIllumination;
     Texture2D<float> gValidSpp;
-    Texture2D<float4> gReflectance;
     Texture2D<float2> gLinearZ;
     Texture2D<float4> gNormalRoughnessMaterialID;
 

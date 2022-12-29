@@ -32,7 +32,6 @@ import Utils.Math.MathHelpers; //temporary for showing normal
 
 cbuffer PerImageCB
 {
-    Texture2D   gDiffuseReflectance;
     Texture2D<float4> gIllumination;
     Texture2D<float> gValidSpp;
     Texture2D gHistoryLength;
