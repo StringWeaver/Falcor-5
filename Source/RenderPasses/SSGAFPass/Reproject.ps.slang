@@ -126,8 +126,7 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     float4 prevIllumination;
     float oldSpp;
     bool success = loadPrevData(posH.xy, prevIllumination, oldSpp, historyLength);
-    const float eps = 1e-6;
-    if (historyLength > gMaxHistoryLength - eps) { // historyLength >=  gMaxHistoryLength
+    if (historyLength >= gMaxHistoryLength) {
         float temporalRetireFactor = (gMaxHistoryLength - 1.f) / historyLength;
         historyLength = gMaxHistoryLength - 1.f;
         oldSpp *= temporalRetireFactor;
