@@ -67,7 +67,7 @@ PS_OUT main(FullScreenPassVsOut vsOut) {
         return psOut;
     }
     const int2 screenSize = getTextureDims(gIllumination, 0);
-    float4 illuminationCenter = gIllumination.Load(int3(ipos, 0));
+    float4 illuminationCenter = gIllumination[ipos];
     // float validSampleCountCenter = gHistoryLength[ipos].x;
     const float illuminationLuminanceCenter = luminance(illuminationCenter.rgb);
     const float sppCenter = gIsFirstPass ? 1.f : gValidSpp[ipos];
@@ -86,7 +86,7 @@ PS_OUT main(FullScreenPassVsOut vsOut) {
             const bool inside = all(p >= int2(0, 0)) && all(p < screenSize);
             if (inside) // skip center pixel, it is already accumulated
             {
-                const float4 illuminationP = gIllumination.Load(int3(p, 0));
+                const float4 illuminationP = gIllumination[p];
                 const float illuminationLuminanceP = luminance(illuminationP.rgb);
                 const float zP = gLinearZ[p].x;
                 const float3 nP = oct_to_ndir_unorm(gNormalRoughnessMaterialID[p].xy);
