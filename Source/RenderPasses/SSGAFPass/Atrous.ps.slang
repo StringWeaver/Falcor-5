@@ -93,12 +93,12 @@ PS_OUT main(FullScreenPassVsOut vsOut) {
                 float sppP = gIsFirstPass ? 1.f : gValidSpp[p];
                 // compute the edge-stopping functions
                 float phiLIllumination;
-                if (sppCenter < gIgnorePhiColorSampleCountThreshold || sppP < gIgnorePhiColorSampleCountThreshold) {
-                    phiLIllumination = 1e5;
-                } else {
+                if (sppCenter >= gIgnorePhiColorSampleCountThreshold && sppP >= gIgnorePhiColorSampleCountThreshold) {
                     phiLIllumination = gPhiColor;
+                } else {
+                    phiLIllumination = 20.0f;
                 }
-                const float wIllumination = sppP * computeWeight(step, 0, gPhiXY,zCenter, zP, gPhiDepth,nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
+                const float wIllumination = sppP * computeWeight(step, 0, gPhiXY, zCenter, zP, gPhiDepth, nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
                 //const float wIllumination = computeWeightBspline(step, gPhiXY, zCenter, zP, gPhiDepth, nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
                 sumWIllumination += wIllumination;
                 sumIllumination += wIllumination * illuminationP;
