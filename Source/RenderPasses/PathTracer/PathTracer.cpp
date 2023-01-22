@@ -174,6 +174,7 @@ namespace
 
     const std::string kUseNRDDemodulation = "useNRDDemodulation";
     const std::string kSetRadianceAlphaTo2ndMoment = "setRadianceAlphaTo2ndMoment";
+    const std::string kUseLnPathLength = "useLnPathLength";
 }
 
 // Don't remove this. it's required for hot-reload to function properly
@@ -287,6 +288,7 @@ void PathTracer::parseDictionary(const Dictionary& dict)
         // Denoising parameters
         else if (key == kUseNRDDemodulation) mStaticParams.useNRDDemodulation = value;
         else if (key == kSetRadianceAlphaTo2ndMoment) mStaticParams.setRadianceAlphaTo2ndMoment = value;
+        else if (key == kUseLnPathLength) mStaticParams.useLnPathLength = value;
 
         // Output parameters
         else if (key == kOutputSize) mOutputSizeSelection = value;
@@ -404,6 +406,7 @@ Dictionary PathTracer::getScriptingDictionary()
     // Denoising parameters
     d[kUseNRDDemodulation] = mStaticParams.useNRDDemodulation;
     d[kSetRadianceAlphaTo2ndMoment] = mStaticParams.setRadianceAlphaTo2ndMoment;
+    d[kUseLnPathLength] = mStaticParams.useLnPathLength;
 
     // Output parameters
     d[kOutputSize] = mOutputSizeSelection;
@@ -657,8 +660,9 @@ bool PathTracer::renderRenderingUI(Gui::Widgets& widget)
     if (auto group = widget.group("Denoiser options"))
     {
         dirty |= widget.checkbox("Use NRD demodulation", mStaticParams.useNRDDemodulation);
-        dirty |= widget.checkbox("Set radiance alpha chanel to 2nd moment", mStaticParams.setRadianceAlphaTo2ndMoment);
         widget.tooltip("Global switch for NRD demodulation");
+        dirty |= widget.checkbox("Set radiance alpha chanel to 2nd moment", mStaticParams.setRadianceAlphaTo2ndMoment);
+        dirty |= widget.checkbox("Apply ln() funtion to pathLength", mStaticParams.useLnPathLength);
     }
 
     if (auto group = widget.group("Output options"))
@@ -1387,6 +1391,7 @@ Program::DefineList PathTracer::StaticParams::getDefines(const PathTracer& owner
     defines.add("PRIMARY_LOD_MODE", std::to_string((uint32_t)primaryLodMode));
     defines.add("USE_NRD_DEMODULATION", useNRDDemodulation ? "1" : "0");
     defines.add("SET_RADIANCE_ALPHA_CHANNEL_TO_2ND_MOMENT", setRadianceAlphaTo2ndMoment ? "1" : "0");
+    defines.add("USE_LN_PATHLENGTH", useLnPathLength ? "1" : "0");
     defines.add("COLOR_FORMAT", std::to_string((uint32_t)colorFormat));
     defines.add("MIS_HEURISTIC", std::to_string((uint32_t)misHeuristic));
     defines.add("MIS_POWER_EXPONENT", std::to_string(misPowerExponent));

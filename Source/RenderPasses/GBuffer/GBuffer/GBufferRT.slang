@@ -48,6 +48,7 @@ RWTexture2D<uint4>  gMaterialData;
 RWTexture2D<PackedHitInfo> gVBuffer;
 RWTexture2D<float>  gDepth;
 RWTexture2D<float2> gLinearZ;
+RWTexture2D<float>  gPathLength;
 RWTexture2D<float4> gMotionVectorW;
 RWTexture2D<float4> gNormalWRoughnessMaterialID;
 RWTexture2D<float4> gDiffOpacity;
@@ -70,6 +71,8 @@ struct GBufferRT
     static const TexLODMode kLODMode = TexLODMode(LOD_MODE);
     static const bool kAdjustShadingNormals = ADJUST_SHADING_NORMALS;
     static const uint kRayFlags = RAY_FLAGS;
+    static const bool kUseLnPathLength = USE_LN_PATH_LENGTH;
+    static const float kEpsLog = 0.0000000001f;
     static const float kEnvMapDepth = 100000000.0f; // Arbitrary big number
 
     uint2 frameDim;
@@ -283,6 +286,10 @@ struct GBufferRT
             float dLinearZ = max(ddxLinearZ, ddyLinearZ);
             gLinearZ[pixel] = float2(curLinearZ, dLinearZ);
         }
+        if (is_valid(gPathLength)) {
+            float primaryHitDist = length(sd.posW - rayOrigin);
+            gPathLength[pixel] = kUseLnPathLength ? log(primaryHitDist + kEpsLog) : primaryHitDist;
+        }
 
         // Output a depth buffer similar to raster (NDC).
         if (is_valid(gDepth))
@@ -337,6 +344,7 @@ struct GBufferRT
         if (is_valid(gVBuffer))                     gVBuffer[pixel]                     = {};
         if (is_valid(gDepth))                       gDepth[pixel]                       = 1.f;
         if (is_valid(gLinearZ))                     gLinearZ[pixel]                     = float2(kEnvMapDepth, 0.f);
+        if (is_valid(gPathLength))                  gPathLength[pixel]                  = kUseLnPathLength ? log(kEnvMapDepth) : kEnvMapDepth;
         if (is_valid(gMotionVectorW))               gMotionVectorW[pixel]               = {};
         if (is_valid(gNormalWRoughnessMaterialID))  gNormalWRoughnessMaterialID[pixel]  = float4(octNormal, roughness, materialID);
         if (is_valid(gDiffOpacity))                 gDiffOpacity[pixel]                 = {};

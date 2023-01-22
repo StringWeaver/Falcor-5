@@ -36,6 +36,7 @@ import NRDHelpers;
 */
 extension PathTracer
 {
+    static const bool kUseLnPathLength = USE_LN_PATHLENGTH;
     /** Handle hit on delta reflection materials.
         After handling the hit, the path is terminated.
         Executed only for guide paths.
@@ -108,7 +109,8 @@ extension PathTracer
                 const float3 reflectance = getMaterialReflectanceForDeltaPaths(materialType, hasDeltaLobes, sd, bsdfProperties);
                 const float primaryHitDist = path.pdf;
                 const float hitDist = float(path.sceneLength) - primaryHitDist;
-                writeNRDDeltaReflectionGuideBuffers(outputNRD, kUseNRDDemodulation, pixel, reflectance, emission, sd.N, bsdfProperties.roughness, float(path.sceneLength), hitDist);
+                float pathLength = kUseLnPathLength ? log(float(path.sceneLength)) : float(path.sceneLength);
+                writeNRDDeltaReflectionGuideBuffers(outputNRD, kUseNRDDemodulation, pixel, reflectance, emission, sd.N, bsdfProperties.roughness, pathLength, hitDist);
 
                 path.terminate();
                 return;
@@ -164,7 +166,8 @@ extension PathTracer
                 const float3 reflectance = getMaterialReflectanceForDeltaPaths(materialType, hasDeltaLobes, sd, bsdfProperties);
                 const float primaryHitDist = path.pdf;
                 const float hitDist = float(path.sceneLength) - primaryHitDist;
-                writeNRDDeltaReflectionGuideBuffers(outputNRD, kUseNRDDemodulation, pixel, reflectance, emission, sd.N, bsdfProperties.roughness, float(path.sceneLength), hitDist);
+                float pathLength = kUseLnPathLength ? log(float(path.sceneLength)) : float(path.sceneLength);
+                writeNRDDeltaReflectionGuideBuffers(outputNRD, kUseNRDDemodulation, pixel, reflectance, emission, sd.N, bsdfProperties.roughness, pathLength, hitDist);
 
                 path.terminate();
                 return;
@@ -243,7 +246,8 @@ extension PathTracer
         if (lastVertex || semiOpaque)
         {
             float3 emission = path.L;
-            writeNRDDeltaTransmissionGuideBuffers(outputNRD, kUseNRDDemodulation, pixel, getMaterialReflectanceForDeltaPaths(materialType, hasDeltaLobes, sd, bsdfProperties), emission, sd.N, bsdfProperties.roughness, float(path.sceneLength), sd.posW);
+            float pathLength = kUseLnPathLength ? log(float(path.sceneLength)) : float(path.sceneLength);
+            writeNRDDeltaTransmissionGuideBuffers(outputNRD, kUseNRDDemodulation, pixel, getMaterialReflectanceForDeltaPaths(materialType, hasDeltaLobes, sd, bsdfProperties), emission, sd.N, bsdfProperties.roughness, pathLength, sd.posW);
 
             path.terminate();
             return;
@@ -268,7 +272,8 @@ extension PathTracer
         if (!valid)
         {
             float3 emission = path.L;
-            writeNRDDeltaTransmissionGuideBuffers(outputNRD, kUseNRDDemodulation, pixel, getMaterialReflectanceForDeltaPaths(materialType, hasDeltaLobes, sd, bsdfProperties), emission, sd.N, bsdfProperties.roughness, float(path.sceneLength), sd.posW);
+            float pathLength = kUseLnPathLength ? log(float(path.sceneLength)) : float(path.sceneLength);
+            writeNRDDeltaTransmissionGuideBuffers(outputNRD, kUseNRDDemodulation, pixel, getMaterialReflectanceForDeltaPaths(materialType, hasDeltaLobes, sd, bsdfProperties), emission, sd.N, bsdfProperties.roughness, pathLength, sd.posW);
 
             path.terminate();
             return;

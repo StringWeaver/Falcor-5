@@ -54,6 +54,9 @@ namespace
         { (uint32_t)TexLODMode::RayCones, "Ray Cones" },
     };
 
+    // Scripting options.
+    const std::string kUseLnPathLength = "useLnPathLength";
+
     // Additional output channels.
     const std::string kVBufferName = "vbuffer";
     const ChannelList kGBufferExtraChannels =
@@ -61,6 +64,7 @@ namespace
         { kVBufferName,                 "gVBuffer",                     "Visibility buffer",                                    true /* optional */, ResourceFormat::Unknown /* set at runtime */ },
         { "depth",                      "gDepth",                       "Depth buffer (NDC)",                                   true /* optional */, ResourceFormat::R32Float     },
         { "linearZ",                    "gLinearZ",                     "Linear Z and slope",                                   true /* optional */, ResourceFormat::RG32Float    },
+        { "pathLength",                 "gPathLength",                  "PathLength of primary ray",                            true /* optional */, ResourceFormat::R32Float     },
         { "mvecW",                      "gMotionVectorW",               "Motion vector in world space",                         true /* optional */, ResourceFormat::RGBA16Float  },
         { "normWRoughnessMaterialID",   "gNormalWRoughnessMaterialID",  "Normal in world space, roughness, and material ID",    true /* optional */, ResourceFormat::RGB10A2Unorm },
         { "diffuseOpacity",             "gDiffOpacity",                 "Diffuse reflection albedo and opacity",                true /* optional */, ResourceFormat::RGBA32Float  },
@@ -168,6 +172,11 @@ void GBufferRT::renderUI(Gui::Widgets& widget)
         mOptionsChanged = true;
     }
     widget.tooltip("This option enables stochastic depth-of-field when the camera's aperture radius is nonzero. Disable it to force the use of a pinhole camera.", true);
+
+    if (widget.checkbox("Use ln pathlength", mUseLnPathLength))
+    {
+        mOptionsChanged = true;
+    }
 }
 
 Dictionary GBufferRT::getScriptingDictionary()
@@ -176,6 +185,7 @@ Dictionary GBufferRT::getScriptingDictionary()
     dict[kLODMode] = mLODMode;
     dict[kUseTraceRayInline] = mUseTraceRayInline;
     dict[kUseDOF] = mUseDOF;
+    dict[kUseLnPathLength] = mUseLnPathLength;
     return dict;
 }
 
@@ -294,6 +304,7 @@ Program::DefineList GBufferRT::getShaderDefines(const RenderData& renderData) co
     defines.add("USE_ALPHA_TEST", mUseAlphaTest ? "1" : "0");
     defines.add("LOD_MODE", std::to_string((uint32_t)mLODMode));
     defines.add("ADJUST_SHADING_NORMALS", mAdjustShadingNormals ? "1" : "0");
+    defines.add("USE_LN_PATH_LENGTH", mUseLnPathLength ? "1" : "0");
 
     // Setup ray flags.
     RayFlags rayFlags = RayFlags::None;
@@ -314,6 +325,8 @@ void GBufferRT::setShaderData(const ShaderVar& var, const RenderData& renderData
     var["gGBufferRT"]["invFrameDim"] = mInvFrameDim;
     var["gGBufferRT"]["frameCount"] = mFrameCount;
     var["gGBufferRT"]["screenSpacePixelSpreadAngle"] = mpScene->getCamera()->computeScreenSpacePixelSpreadAngle(mFrameDim.y);
+    const float FOVYrad = focalLengthToFovY(mpScene->getCamera()->getFocalLength(), mpScene->getCamera()->getFrameHeight());
+    const float logLinearZCoefficient = float(mFrameDim.y  / (2.0 * std::tan(0.5 * FOVYrad)));
 
     // Bind output channels as UAV buffers.
     auto bind = [&](const ChannelDesc& channel)
@@ -343,6 +356,7 @@ void GBufferRT::parseDictionary(const Dictionary& dict)
         if (key == kLODMode) mLODMode = value;
         else if (key == kUseTraceRayInline) mUseTraceRayInline = value;
         else if (key == kUseDOF) mUseDOF = value;
+        else if (key == kUseLnPathLength) mUseLnPathLength = value;
         // TODO: Check for unparsed fields, including those parsed in base classes.
     }
 }

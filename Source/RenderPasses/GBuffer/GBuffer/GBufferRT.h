@@ -69,6 +69,7 @@ private:
     TexLODMode mLODMode = TexLODMode::Mip0;
     bool mUseTraceRayInline = false;
     bool mUseDOF = true;                ///< Option for enabling depth-of-field when camera's aperture radius is nonzero.
+    bool mUseLnPathLength = false;
 
     // Ray tracing resources
     struct
