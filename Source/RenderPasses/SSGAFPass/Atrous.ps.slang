@@ -35,7 +35,7 @@ cbuffer PerImageCB
 {
     Texture2D<float4> gIllumination;
     Texture2D<float> gValidSpp;
-    Texture2D<float2> gLinearZ;
+    Texture2D<float2> gPathLength;
     Texture2D<float4> gNormalRoughnessMaterialID;
 
     int2 gPattern;
@@ -58,7 +58,7 @@ PS_OUT main(FullScreenPassVsOut vsOut) {
     // constant samplers to prevent the compiler from generating code which
     // fetches the sampler descriptor from memory for each texture access
 
-    const float zCenter = gLinearZ[ipos].x;
+    const float zCenter = gPathLength[ipos].x;
     if (zCenter <= 0)
     {
         // not a valid depth => must be envmap => do not filter
@@ -88,7 +88,7 @@ PS_OUT main(FullScreenPassVsOut vsOut) {
             {
                 const float4 illuminationP = gIllumination[p];
                 const float illuminationLuminanceP = luminance(illuminationP.rgb);
-                const float zP = gLinearZ[p].x;
+                const float zP = gPathLength[p].x;
                 const float3 nP = oct_to_ndir_unorm(gNormalRoughnessMaterialID[p].xy);
                 float sppP = gIsFirstPass ? 1.f : gValidSpp[p];
                 // compute the edge-stopping functions

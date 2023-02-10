@@ -173,7 +173,7 @@ void GBufferRT::renderUI(Gui::Widgets& widget)
     }
     widget.tooltip("This option enables stochastic depth-of-field when the camera's aperture radius is nonzero. Disable it to force the use of a pinhole camera.", true);
 
-    if (widget.checkbox("Use ln pathlength", mUseLnPathLength))
+    if (widget.checkbox("Apply ln() to pathlength", mUseLnPathLength))
     {
         mOptionsChanged = true;
     }

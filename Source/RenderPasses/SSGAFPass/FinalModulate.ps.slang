@@ -35,7 +35,7 @@ cbuffer PerImageCB
     Texture2D<float4> gIllumination;
     Texture2D<float> gValidSpp;
     Texture2D gHistoryLength;
-    Texture2D gLinearZ;
+    Texture2D gPathLength;
     Texture2D gNormalRoughnessMaterialID;
     float gMaxHistoryLength;
     float gDbgViewScaleFactor;
@@ -50,7 +50,7 @@ PS_OUT main(FullScreenPassVsOut vsOut)
 {
     PS_OUT psOut;
     const int2 ipos = int2(vsOut.posH.xy);
-    const float zCenter = gLinearZ[ipos].x;
+    const float zCenter = gPathLength[ipos].x;
     const float3 nCenter = oct_to_ndir_unorm(gNormalRoughnessMaterialID[ipos].xy);
     float o1stMoment = luminance(gIllumination[ipos].rgb);
     float variance = gIllumination[ipos].a - o1stMoment * o1stMoment;

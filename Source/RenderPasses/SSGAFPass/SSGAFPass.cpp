@@ -39,7 +39,6 @@ const RenderPass::Info SSGAFPass::kInfo { "SSGAFPass", "SSGAF denoising pass for
 
 namespace {
 // Shader source files
-const char kPackLinearZAndNormalShader[] = "RenderPasses/SSGAFPass/PackLinearZAndNormal.ps.slang";
 const char kReprojectShader[] = "RenderPasses/SSGAFPass/Reproject.ps.slang";
 const char kAtrousShader[] = "RenderPasses/SSGAFPass/Atrous.ps.slang";
 const char kFinalModulateShader[] = "RenderPasses/SSGAFPass/FinalModulate.ps.slang";
@@ -60,11 +59,11 @@ const char kMaxHistoryLength[] = "MaxHistoryLength";
 // Input buffer names
 const char kInputBufferIllumination[] = "Illumination";
 const char kInputNormalRoughnessMaterialID[] = "normWRoughnessMaterialID";
-const char kInputBufferLinearZ[] = "LinearZ";
+const char kInputBufferPathLength[] = "PathLength";
 const char kInputBufferMotionVector[] = "MotionVec";
 
 // Internal buffer names
-const char kInternalBuffersPreviousLinearZ[] = "Previous Linear Z";
+const char kInternalBuffersPreviousPathLength[] = "Previous Path Length";
 const char kInternalBufferPreviousLighting[] = "Previous Lighting";
 const char kInternalBufferPrevFrameValidSpp[] = "Previous Valid Spp";
 const char kInternalBufferValidSpp0[] = "Valid Spp 0";
@@ -145,17 +144,6 @@ Dictionary SSGAFPass::getScriptingDictionary()
     return dict;
 }
 
-/*
-Reproject:
-  - takes: motion, color, prevLighting, prevMoments, linearZ, prevLinearZ, historyLen
-    returns: illumination, moments, historyLength
-Variance/filter moments:
-  - takes: illumination, moments, history length, normal+depth
-  - returns: filtered illumination+variance (to ping pong fbo)
-a-trous:
-  - takes: albedo, filtered illumination+variance, normal+depth, history length
-  - returns: final color
-*/
 
 RenderPassReflection SSGAFPass::reflect(const CompileData& compileData)
 {
@@ -163,10 +151,10 @@ RenderPassReflection SSGAFPass::reflect(const CompileData& compileData)
 
     reflector.addInput(kInputBufferIllumination, "Radiance");
     reflector.addInput(kInputNormalRoughnessMaterialID, "World normal, roughness, and material ID");
-    reflector.addInput(kInputBufferLinearZ, "LinearZ");
+    reflector.addInput(kInputBufferPathLength, "PathLength");
     reflector.addInput(kInputBufferMotionVector, "Motion vectors");
 
-    reflector.addInternal(kInternalBuffersPreviousLinearZ, "Previous Linear Z")
+    reflector.addInternal(kInternalBuffersPreviousPathLength, "Previous Linear Z")
         .format(ResourceFormat::R32Float)
         .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
     reflector.addInternal(kInternalBufferPreviousLighting, "Previous Filtered Lighting")
@@ -214,11 +202,11 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
 {
     Texture::SharedPtr pIlluminationTexture = renderData[kInputBufferIllumination]->asTexture();
     Texture::SharedPtr pNormalRoughnessMaterialIDTexture = renderData[kInputNormalRoughnessMaterialID]->asTexture();
-    Texture::SharedPtr pLinearZTexture = renderData[kInputBufferLinearZ]->asTexture();
+    Texture::SharedPtr pPathLengthTexture = renderData[kInputBufferPathLength]->asTexture();
     Texture::SharedPtr pMotionVectorTexture = renderData[kInputBufferMotionVector]->asTexture();
     Texture::SharedPtr pPrevFrameIllumTexture = renderData[kInternalBufferPreviousLighting]->asTexture();
     Texture::SharedPtr pPrevFrameValidSppTexture = renderData[kInternalBufferPrevFrameValidSpp]->asTexture();
-    Texture::SharedPtr pPrevFrameLinearZTexture = renderData[kInternalBuffersPreviousLinearZ]->asTexture();
+    Texture::SharedPtr pPrevFramePathLengthTexture = renderData[kInternalBuffersPreviousPathLength]->asTexture();
     Texture::SharedPtr pPrevHistoryLengthTexture;
     Texture::SharedPtr pHistoryLengthTexture;
     if (!mPrevFrameTextureIndex) {
@@ -252,7 +240,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
         // next time into mpFilteredPastFbo.
 
         auto spatialPassVars = mpAtrous["PerImageCB"];
-        spatialPassVars["gLinearZ"] = pLinearZTexture;
+        spatialPassVars["gPathLength"] = pPathLengthTexture;
         spatialPassVars["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
         spatialPassVars["gPhiXY"] = mPhiXY;
         spatialPassVars["gPhiColor"] = mPhiColor;
@@ -304,8 +292,8 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                 reprojPassVars["gPrevHistoryLength"] = pPrevHistoryLengthTexture;
                 reprojPassVars["gPrevFrameValidSpp"] = pPrevFrameValidSppTexture;
                 reprojPassVars["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
-                reprojPassVars["gLinearZ"] = pLinearZTexture;
-                reprojPassVars["gPrevLinearZ"] = pPrevFrameLinearZTexture;
+                reprojPassVars["gPathLength"] = pPathLengthTexture;
+                reprojPassVars["gPrevPathLength"] = pPrevFramePathLengthTexture;
                 // Setup variables for our reprojection pass
                 reprojPassVars["gMaxHistoryLength"] = mMaxHistoryLength;
                 reprojPassVars["gPhiDepth"] = mPhiDepth;
@@ -330,7 +318,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
         finalPassVars["gValidSpp"] = pPrevIterValidSppTexture;
         finalPassVars["gHistoryLength"] = pHistoryLengthTexture;
         finalPassVars["gMaxHistoryLength"] = mMaxHistoryLength;
-        finalPassVars["gLinearZ"] = pLinearZTexture;
+        finalPassVars["gPathLength"] = pPathLengthTexture;
         finalPassVars["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
         finalPassVars["gDbgViewScaleFactor"] = mDbgViewScaleFactor;
         mpFinalFbo->attachColorTarget(pOutputDebugView0Texture, 0);
@@ -344,7 +332,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
 
         // Swap resources so we're ready for next frame.
         mPrevFrameTextureIndex = !mPrevFrameTextureIndex;
-        pRenderContext->blit(pLinearZTexture->getSRV(), pPrevFrameLinearZTexture->getRTV());
+        pRenderContext->blit(pPathLengthTexture->getSRV(), pPrevFramePathLengthTexture->getRTV());
     } else {
         pRenderContext->blit(pIlluminationTexture->getSRV(), pOutputColorTexture->getRTV());
     }
@@ -355,7 +343,7 @@ void SSGAFPass::clearBuffers(RenderContext* pRenderContext, const RenderData& re
     pRenderContext->clearFbo(mpAtrousFbo.get(), float4(0), 1.0f, 0, FboAttachmentType::All);
     pRenderContext->clearFbo(mpReprojFbo.get(), float4(0), 1.0f, 0, FboAttachmentType::All);
 
-    pRenderContext->clearTexture(renderData[kInternalBuffersPreviousLinearZ]->asTexture().get());
+    pRenderContext->clearTexture(renderData[kInternalBuffersPreviousPathLength]->asTexture().get());
     pRenderContext->clearTexture(renderData[kInternalBufferPreviousLighting]->asTexture().get());
     pRenderContext->clearTexture(renderData[kInternalBufferHistoryLength0]->asTexture().get());
     pRenderContext->clearTexture(renderData[kInternalBufferHistoryLength1]->asTexture().get());
