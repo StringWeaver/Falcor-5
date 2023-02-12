@@ -29,6 +29,8 @@
 // Static configuration based on which buffers are bound.
 #define is_valid(name) (is_valid_##name != 0)
 
+import Utils.Color.ColorHelpers;
+
 cbuffer CB
 {
     uint2 frameDim;
@@ -47,6 +49,7 @@ Texture2D gDeltaTransmissionReflectance;
 Texture2D gDeltaTransmissionRadiance;
 Texture2D gResidualRadiance;
 
+RWTexture2D gOutNoiseLevel;
 RWTexture2D gOutput;
 
 [numthreads(16, 16, 1)]
@@ -56,6 +59,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
     if (any(pixel >= frameDim)) return;
 
     float4 outputColor = float4(0.f);
+    float outputNoiseLevel = 0.f;
 
     if (is_valid(gEmission))
     {
@@ -71,6 +75,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
             diffuseColor *= gDiffuseReflectance[pixel].rgb;
         }
         outputColor.rgb += diffuseColor;
+        outputNoiseLevel +=  gDiffuseRadiance[pixel].a;
     }
 
     if (is_valid(gSpecularRadiance))
@@ -83,6 +88,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
         }
 
         outputColor.rgb += specularColor;
+        outputNoiseLevel += gSpecularRadiance[pixel].a;
     }
 
     if (is_valid(gDeltaReflectionEmission))
@@ -100,6 +106,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
         }
 
         outputColor.rgb += deltaReflectionColor;
+        outputNoiseLevel += gDeltaReflectionRadiance[pixel].a;
     }
 
     if (is_valid(gDeltaTransmissionEmission))
@@ -117,12 +124,17 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
         }
 
         outputColor.rgb += deltaTransmissionColor;
+        outputNoiseLevel += gDeltaTransmissionRadiance[pixel].a;
     }
 
     if (is_valid(gResidualRadiance))
     {
         outputColor.rgb += gResidualRadiance[pixel].rgb;
+        outputNoiseLevel += gResidualRadiance[pixel].a;
     }
 
     gOutput[pixel] = outputColor;
+    if(is_valid(gOutNoiseLevel)){
+        gOutNoiseLevel[pixel] = outputNoiseLevel;
+    }
 }

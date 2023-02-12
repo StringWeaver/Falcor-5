@@ -42,9 +42,8 @@ cbuffer PerImageCB
     
 };
 struct PS_OUT{
-    float outDbgView0 : SV_TARGET0;
-    float outDbgView1 : SV_TARGET1;
-    float4 outDbgView2 : SV_TARGET2;
+    float4 outRadiance : SV_TARGET0;
+    float outDbgView : SV_TARGET1;
 }
 PS_OUT main(FullScreenPassVsOut vsOut) 
 {
@@ -55,8 +54,7 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     float o1stMoment = luminance(gIllumination[ipos].rgb);
     float variance = gIllumination[ipos].a - o1stMoment * o1stMoment;
     float noiseLevel = sqrt(variance / gValidSpp[ipos])/(o1stMoment + 0.1f);
-    psOut.outDbgView0 = gValidSpp[ipos] * gDbgViewScaleFactor;
-    psOut.outDbgView1 = gIllumination[ipos].a * gDbgViewScaleFactor;
-    psOut.outDbgView2 = float4(noiseLevel) * gDbgViewScaleFactor;
+    psOut.outRadiance =  float4(gIllumination[ipos].rgb, noiseLevel);
+    psOut.outDbgView = noiseLevel * gDbgViewScaleFactor;
     return psOut;
 }

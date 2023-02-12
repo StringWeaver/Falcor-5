@@ -40,12 +40,11 @@ namespace {
     const std::string kPathTracerPassDict = "PathTracerPassDict";
     const std::string kSVGFPassDict = "SVGFPassDict";
     // SVGF Input buffer names
-    const char kInputBufferLinearZ[] = "LinearZ";
     const char kInputBufferMotionVector[] = "MotionVec";
     // PathTracer Input buffer names
     const std::string kInputVBuffer = "vbuffer";
     //Internal buffer names
-    const char kInternalBufferPreviousVariance[] = "PreviousVariance";
+    const char kInOutBufferPreviousNoiseLevel[] = "PreviousNoiseLevel";
     const char kInternalBufferSampleCount[] = "SampleCount";
 
 }
@@ -107,9 +106,9 @@ RenderPassReflection SVGFAdaptiveSampling::reflect(const CompileData& compileDat
     //reflector.addOutput("dst");
     
     reflector.addInput(kInputBufferMotionVector, "Motion vectors");
-    reflector.addOutput(kInternalBufferPreviousVariance, "Previous Variance")
+    reflector.addOutput(kInOutBufferPreviousNoiseLevel, "Previous NoiseLevel")
         .format(ResourceFormat::R16Float)
-        .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
+        .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource | Resource::BindFlags::UnorderedAccess);
     reflector.addOutput(kInternalBufferSampleCount, "Sample Count")
         .format(ResourceFormat::R8Uint)
         .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
@@ -124,17 +123,16 @@ void SVGFAdaptiveSampling::execute(RenderContext* pRenderContext, const RenderDa
     // auto& pTexture = renderData["src"]->asTexture();
     if (!mpScene) return;
 
-    auto pLinearZ = renderData[kInputBufferLinearZ]->asTexture();
     auto pMotionVector = renderData[kInputBufferMotionVector]->asTexture();
-    auto pPreviousVariance = renderData[kInternalBufferPreviousVariance]->asTexture();
+    auto pPreviousNoiseLevel = renderData[kInOutBufferPreviousNoiseLevel]->asTexture();
     auto pSampleCount = renderData[kInternalBufferSampleCount]->asTexture();
 
     FALCOR_ASSERT(mpFbo);
     mpFbo->attachColorTarget(pSampleCount, 0); //set sampleCount as render target
     FALCOR_ASSERT(mpFbo->getWidth() == pSampleCount->getWidth() && mpFbo->getHeight() == pSampleCount->getHeight());
-    FALCOR_ASSERT(mpFbo->getWidth() == pPreviousVariance->getWidth() && mpFbo->getHeight() == pPreviousVariance->getHeight());
+    FALCOR_ASSERT(mpFbo->getWidth() == pPreviousNoiseLevel->getWidth() && mpFbo->getHeight() == pPreviousNoiseLevel->getHeight());
     auto perImageCB = mpSampleCountPass["PerImageCB"];
-    perImageCB["gPrevVariance"] = pPreviousVariance;
+    perImageCB["gPrevNoiseLevel"] = pPreviousNoiseLevel;
     perImageCB["gMotion"] = pMotionVector;
     perImageCB["gThreshold2spp"] = mThreshold2spp;
     perImageCB["gThreshold3spp"] = mThreshold3spp;
@@ -148,8 +146,8 @@ void SVGFAdaptiveSampling::renderUI(Gui::Widgets& widget)
     widget.checkbox("Enable Adaptive Sampling", mUseAdaptiveSampling);
     if (mUseAdaptiveSampling) {
         widget.text("Contol Adaptive Sampling Threshold");
-        widget.var("2spp threshold", mThreshold2spp, 0.0f, 0.1f, 0.01f);
-        widget.var("3spp threshold", mThreshold3spp, 0.1f, 1.0f, 0.01f);
+        widget.var("2spp threshold", mThreshold2spp, 0.0f, 1.0f, 0.00001f);
+        widget.var("3spp threshold", mThreshold3spp, 0.0f, 1.0f, 0.00001f);
     }
     else {
         widget.var("Fixed spp", mFixedSpp, uint32_t(1), uint32_t(5));

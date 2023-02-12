@@ -41,7 +41,7 @@ namespace {
 // Shader source files
 const char kReprojectShader[] = "RenderPasses/SSGAFPass/Reproject.ps.slang";
 const char kAtrousShader[] = "RenderPasses/SSGAFPass/Atrous.ps.slang";
-const char kFinalModulateShader[] = "RenderPasses/SSGAFPass/FinalModulate.ps.slang";
+const char kNoiseLevelShader[] = "RenderPasses/SSGAFPass/NoiseLevel.ps.slang";
 
 // Names of valid entries in the parameter dictionary.
 const char kEnabled[] = "Enabled";
@@ -74,8 +74,6 @@ const char kInternalBufferHistoryLength1[] = "HistoryLength 1";
 // Output buffer name
 const char kOutputBufferFilteredImage[] = "Filtered image";
 const char kOutputBufferDebugView0[] = "Debug View 0";
-const char kOutputBufferDebugView1[] = "Debug View 1";
-const char kOutputBufferDebugView2[] = "Debug View 2";
 }
 
 // Don't remove this. it's required for hot-reload to function properly
@@ -124,8 +122,8 @@ SSGAFPass::SSGAFPass(const Dictionary& dict)
 
     mpReprojection = FullScreenPass::create(kReprojectShader);
     mpAtrous = FullScreenPass::create(kAtrousShader);
-    mpFinalModulate = FullScreenPass::create(kFinalModulateShader);
-    FALCOR_ASSERT(mpReprojection && mpAtrous && mpFinalModulate);
+    mpNoiseLevel = FullScreenPass::create(kNoiseLevelShader);
+    FALCOR_ASSERT(mpReprojection && mpAtrous && mpNoiseLevel);
 }
 
 Dictionary SSGAFPass::getScriptingDictionary()
@@ -178,8 +176,6 @@ RenderPassReflection SSGAFPass::reflect(const CompileData& compileData)
 
     reflector.addOutput(kOutputBufferFilteredImage, "Filtered image").format(ResourceFormat::RGBA32Float);
     reflector.addOutput(kOutputBufferDebugView0, kOutputBufferDebugView0).format(ResourceFormat::R16Float).bindFlags(Resource::BindFlags::RenderTarget);
-    reflector.addOutput(kOutputBufferDebugView1, kOutputBufferDebugView1).format(ResourceFormat::R16Float).bindFlags(Resource::BindFlags::RenderTarget);
-    reflector.addOutput(kOutputBufferDebugView2, kOutputBufferDebugView2).format(ResourceFormat::RGBA16Float).bindFlags(Resource::BindFlags::RenderTarget);
 
     return reflector;
 }
@@ -192,7 +188,7 @@ void SSGAFPass::compile(RenderContext* pRenderContext, const CompileData& compil
         desc.setSampleCount(0);
         mpReprojFbo = Fbo::create2D(dim.x, dim.y, desc);
         mpAtrousFbo = Fbo::create2D(dim.x, dim.y, desc);
-        mpFinalFbo = Fbo::create2D(dim.x, dim.y, desc);
+        mpNoiseLevelFbo = Fbo::create2D(dim.x, dim.y, desc);
     }
 
     mBuffersNeedClear = true;
@@ -220,8 +216,6 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
 
     Texture::SharedPtr pOutputColorTexture = renderData[kOutputBufferFilteredImage]->asTexture();
     Texture::SharedPtr pOutputDebugView0Texture = renderData[kOutputBufferDebugView0]->asTexture();
-    Texture::SharedPtr pOutputDebugView1Texture = renderData[kOutputBufferDebugView1]->asTexture();
-    Texture::SharedPtr pOutputDebugView2Texture = renderData[kOutputBufferDebugView2]->asTexture();
 
     Texture::SharedPtr pPrevIterIllumTexture = pIlluminationTexture;
     Texture::SharedPtr pCurrIterIllumTexture = pOutputColorTexture;
@@ -313,18 +307,17 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
         }
 
         // Compute albedo * filtered illumination and add emission back in.
-        auto finalPassVars = mpFinalModulate["PerImageCB"];
-        finalPassVars["gIllumination"] = pOutputColorTexture;
-        finalPassVars["gValidSpp"] = pPrevIterValidSppTexture;
-        finalPassVars["gHistoryLength"] = pHistoryLengthTexture;
-        finalPassVars["gMaxHistoryLength"] = mMaxHistoryLength;
-        finalPassVars["gPathLength"] = pPathLengthTexture;
-        finalPassVars["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
-        finalPassVars["gDbgViewScaleFactor"] = mDbgViewScaleFactor;
-        mpFinalFbo->attachColorTarget(pOutputDebugView0Texture, 0);
-        mpFinalFbo->attachColorTarget(pOutputDebugView1Texture, 1);
-        mpFinalFbo->attachColorTarget(pOutputDebugView2Texture, 2);
-        mpFinalModulate->execute(pRenderContext, mpFinalFbo);
+        auto noiseLevelPassVars = mpNoiseLevel["PerImageCB"];
+        noiseLevelPassVars["gIllumination"] = pOutputColorTexture;
+        noiseLevelPassVars["gValidSpp"] = pPrevIterValidSppTexture;
+        noiseLevelPassVars["gHistoryLength"] = pHistoryLengthTexture;
+        noiseLevelPassVars["gMaxHistoryLength"] = mMaxHistoryLength;
+        noiseLevelPassVars["gPathLength"] = pPathLengthTexture;
+        noiseLevelPassVars["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
+        noiseLevelPassVars["gDbgViewScaleFactor"] = mDbgViewScaleFactor;
+        mpNoiseLevelFbo->attachColorTarget(pOutputColorTexture, 0);
+        mpNoiseLevelFbo->attachColorTarget(pOutputDebugView0Texture, 1);
+        mpNoiseLevel->execute(pRenderContext, mpNoiseLevelFbo);
 
         if (pPrevIterIllumTexture != pOutputColorTexture) {
             pRenderContext->blit(pPrevIterIllumTexture->getSRV(), pOutputColorTexture->getRTV());
@@ -351,8 +344,6 @@ void SSGAFPass::clearBuffers(RenderContext* pRenderContext, const RenderData& re
     pRenderContext->clearTexture(renderData[kInternalBufferValidSpp1]->asTexture().get());
     pRenderContext->clearTexture(renderData[kInternalBufferPrevFrameValidSpp]->asTexture().get());
     pRenderContext->clearTexture(renderData[kOutputBufferDebugView0]->asTexture().get());
-    pRenderContext->clearTexture(renderData[kOutputBufferDebugView1]->asTexture().get());
-    pRenderContext->clearTexture(renderData[kOutputBufferDebugView2]->asTexture().get());
 }
 
 // Extracts linear z and its derivative from the linear Z texture and packs

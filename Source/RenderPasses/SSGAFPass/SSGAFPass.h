@@ -71,11 +71,11 @@ private:
     FullScreenPass::SharedPtr mpReprojection;
     FullScreenPass::SharedPtr mpFilterMoments;
     FullScreenPass::SharedPtr mpAtrous;
-    FullScreenPass::SharedPtr mpFinalModulate;
+    FullScreenPass::SharedPtr mpNoiseLevel;
 
     // Intermediate framebuffers
     Fbo::SharedPtr mpAtrousFbo;
     Fbo::SharedPtr mpReprojFbo;
     Fbo::SharedPtr mpFilteredIlluminationFbo;
-    Fbo::SharedPtr mpFinalFbo;
+    Fbo::SharedPtr mpNoiseLevelFbo;
 };

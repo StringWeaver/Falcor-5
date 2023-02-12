@@ -48,6 +48,7 @@ namespace
         { "deltaTransmissionReflectance",   "gDeltaTransmissionReflectance",    "Delta Transmission Reflectance",   true /* optional */ },
         { "deltaTransmissionRadiance",      "gDeltaTransmissionRadiance",       "Delta Transmission Radiance",      true /* optional */ },
         { "residualRadiance",               "gResidualRadiance",                "Residual Radiance",                true /* optional */ },
+        { "outputNoiseLevel",               "gOutNoiseLevel",                   "Noise Level For Adaptive Sampling",true /* optional */ },
     };
 
     const std::string kOutput = "output";
