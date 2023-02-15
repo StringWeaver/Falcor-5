@@ -66,15 +66,16 @@ private:
     float   mMaxHistoryLength    = 32.0f;
     float   mDbgViewScaleFactor = 0.01f;
     bool    mPrevFrameTextureIndex  = 0;
+    bool    mUseComputeShader = false;
 
     // SSGAF passes
     FullScreenPass::SharedPtr mpReprojection;
     FullScreenPass::SharedPtr mpFilterMoments;
-    FullScreenPass::SharedPtr mpAtrous;
+    FullScreenPass::SharedPtr mpSpatial;
     FullScreenPass::SharedPtr mpNoiseLevel;
 
     // Intermediate framebuffers
-    Fbo::SharedPtr mpAtrousFbo;
+    Fbo::SharedPtr mpSpatialFbo;
     Fbo::SharedPtr mpReprojFbo;
     Fbo::SharedPtr mpFilteredIlluminationFbo;
     Fbo::SharedPtr mpNoiseLevelFbo;

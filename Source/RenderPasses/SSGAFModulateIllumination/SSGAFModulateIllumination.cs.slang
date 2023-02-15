@@ -51,7 +51,9 @@ Texture2D gResidualRadiance;
 
 RWTexture2D gOutNoiseLevel;
 RWTexture2D gOutput;
-
+float computeScaler(float3 a) {
+    return (a.x + a.y + a.z) / 3.f;
+}
 [numthreads(16, 16, 1)]
 void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 {
@@ -59,8 +61,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
     if (any(pixel >= frameDim)) return;
 
     float4 outputColor = float4(0.f);
-    float outputNoiseLevel = 0.f;
-
+    float noiseLevelSum = 0.f;
     if (is_valid(gEmission))
     {
         outputColor.rgb += gEmission[pixel].rgb;
@@ -69,26 +70,29 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
     if (is_valid(gDiffuseRadiance))
     {
         float3 diffuseColor = gDiffuseRadiance[pixel].rgb;
-
+        float scaler = 1.f;
         if (is_valid(gDiffuseReflectance))
         {
             diffuseColor *= gDiffuseReflectance[pixel].rgb;
+            scaler = computeScaler(gDiffuseReflectance[pixel].rgb);
         }
+        noiseLevelSum += scaler * gDiffuseRadiance[pixel].a;
         outputColor.rgb += diffuseColor;
-        outputNoiseLevel +=  gDiffuseRadiance[pixel].a;
+        
     }
 
     if (is_valid(gSpecularRadiance))
     {
         float3 specularColor = gSpecularRadiance[pixel].rgb;
-
+        float scaler = 1.f;
         if (is_valid(gSpecularReflectance))
         {
             specularColor *= gSpecularReflectance[pixel].rgb;
+            scaler = computeScaler(gSpecularReflectance[pixel].rgb);
         }
-
+        noiseLevelSum += scaler * gSpecularRadiance[pixel].a;
         outputColor.rgb += specularColor;
-        outputNoiseLevel += gSpecularRadiance[pixel].a;
+        
     }
 
     if (is_valid(gDeltaReflectionEmission))
@@ -99,14 +103,15 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
     if (is_valid(gDeltaReflectionRadiance))
     {
         float3 deltaReflectionColor = gDeltaReflectionRadiance[pixel].rgb;
-
+        float scaler = 1.f;
         if (is_valid(gDeltaReflectionReflectance))
         {
             deltaReflectionColor *= gDeltaReflectionReflectance[pixel].rgb;
+            scaler = computeScaler(gDeltaReflectionReflectance[pixel].rgb);
         }
-
+        noiseLevelSum += scaler * gDeltaReflectionRadiance[pixel].a;
         outputColor.rgb += deltaReflectionColor;
-        outputNoiseLevel += gDeltaReflectionRadiance[pixel].a;
+        
     }
 
     if (is_valid(gDeltaTransmissionEmission))
@@ -117,24 +122,24 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
     if (is_valid(gDeltaTransmissionRadiance))
     {
         float3 deltaTransmissionColor = gDeltaTransmissionRadiance[pixel].rgb;
-
+        float scaler = 1.f;
         if (is_valid(gDeltaTransmissionReflectance))
         {
             deltaTransmissionColor *= gDeltaTransmissionReflectance[pixel].rgb;
+            scaler = computeScaler(gDeltaTransmissionReflectance[pixel].rgb);
         }
-
+        noiseLevelSum += scaler * gDeltaTransmissionRadiance[pixel].a;
         outputColor.rgb += deltaTransmissionColor;
-        outputNoiseLevel += gDeltaTransmissionRadiance[pixel].a;
     }
 
     if (is_valid(gResidualRadiance))
     {
         outputColor.rgb += gResidualRadiance[pixel].rgb;
-        outputNoiseLevel += gResidualRadiance[pixel].a;
     }
 
     gOutput[pixel] = outputColor;
-    if(is_valid(gOutNoiseLevel)){
-        gOutNoiseLevel[pixel] = outputNoiseLevel;
+    if (is_valid(gOutNoiseLevel)) {
+        float eps = 0.1f;
+        gOutNoiseLevel[pixel] = noiseLevelSum ;
     }
 }

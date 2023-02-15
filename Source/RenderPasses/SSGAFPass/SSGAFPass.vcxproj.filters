@@ -7,9 +7,10 @@
     <ClInclude Include="SSGAFPass.h" />
   </ItemGroup>
   <ItemGroup>
-    <ShaderSource Include="Atrous.ps.slang" />
+    <ShaderSource Include="Spatial.ps.slang" />
     <ShaderSource Include="NoiseLevel.ps.slang" />
     <ShaderSource Include="Reproject.ps.slang" />
     <ShaderSource Include="SSGAFCommon.slang" />
+    <ShaderSource Include="Spatial.cs.slang" />
   </ItemGroup>
 </Project>

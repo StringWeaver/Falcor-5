@@ -34,8 +34,8 @@ namespace {
     // Scripting options.
     const std::string kUseAdaptiveSampling = "useAdaptiveSampling";
     const std::string kFixedSpp = "FixedSpp";
-    const std::string k2SppThreshold = "2SppThreshold";
-    const std::string k3SppThreshold = "3SppThreshold";
+    const std::string kSmoothstepMin = "SmoothstepMin";
+    const std::string kSmoothstepMax = "SmoothStepMax";
     // Subpass dictionary names
     const std::string kPathTracerPassDict = "PathTracerPassDict";
     const std::string kSVGFPassDict = "SVGFPassDict";
@@ -70,8 +70,8 @@ SVGFAdaptiveSampling::SharedPtr SVGFAdaptiveSampling::create(RenderContext* pRen
         {
             if (key == kUseAdaptiveSampling) pPass->mUseAdaptiveSampling = value;
             else if (key == kFixedSpp) pPass->mFixedSpp = value;
-            else if (key == k2SppThreshold) pPass->mThreshold2spp = value;
-            else if (key == k3SppThreshold) pPass->mThreshold3spp = value;
+            else if (key == kSmoothstepMin) pPass->mSmoothstepMin = value;
+            else if (key == kSmoothstepMax) pPass->mSmoothstepMax = value;
             else logWarning("Unknown field '{}' in SVGFAdaptiveSampling dictionary.", key);
         }
     }
@@ -93,8 +93,8 @@ Dictionary SVGFAdaptiveSampling::getScriptingDictionary()
 {
     Dictionary dict;
     dict[kUseAdaptiveSampling] = mUseAdaptiveSampling;
-    dict[k2SppThreshold] = mThreshold2spp;
-    dict[k3SppThreshold] = mThreshold3spp;
+    dict[kSmoothstepMin] = mSmoothstepMin;
+    dict[kSmoothstepMax] = mSmoothstepMax;
     dict[kFixedSpp] = mFixedSpp;
     return dict;
 }
@@ -134,8 +134,8 @@ void SVGFAdaptiveSampling::execute(RenderContext* pRenderContext, const RenderDa
     auto perImageCB = mpSampleCountPass["PerImageCB"];
     perImageCB["gPrevNoiseLevel"] = pPreviousNoiseLevel;
     perImageCB["gMotion"] = pMotionVector;
-    perImageCB["gThreshold2spp"] = mThreshold2spp;
-    perImageCB["gThreshold3spp"] = mThreshold3spp;
+    perImageCB["gSmoothstepMin"] = mSmoothstepMin;
+    perImageCB["gSmoothstepMax"] = mSmoothstepMax;
     perImageCB["gUseAdaptiveSampling"] = mUseAdaptiveSampling;
     perImageCB["gFixedSpp"] = mFixedSpp;
     mpSampleCountPass->execute(pRenderContext, mpFbo);
@@ -146,8 +146,8 @@ void SVGFAdaptiveSampling::renderUI(Gui::Widgets& widget)
     widget.checkbox("Enable Adaptive Sampling", mUseAdaptiveSampling);
     if (mUseAdaptiveSampling) {
         widget.text("Contol Adaptive Sampling Threshold");
-        widget.var("2spp threshold", mThreshold2spp, 0.0f, 1.0f, 0.00001f);
-        widget.var("3spp threshold", mThreshold3spp, 0.0f, 1.0f, 0.00001f);
+        widget.var("Smoothstep min", mSmoothstepMin, 0.0f, 1.0f, 0.001f);
+        widget.var("Smoothstep max", mSmoothstepMax, mSmoothstepMin, 4.0f, 0.001f);
     }
     else {
         widget.var("Fixed spp", mFixedSpp, uint32_t(1), uint32_t(5));

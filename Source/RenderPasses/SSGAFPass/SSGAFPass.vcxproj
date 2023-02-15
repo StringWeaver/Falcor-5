@@ -36,7 +36,8 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ShaderSource Include="Atrous.ps.slang" />
+    <ShaderSource Include="Spatial.cs.slang" />
+    <ShaderSource Include="Spatial.ps.slang" />
     <ShaderSource Include="NoiseLevel.ps.slang" />
     <ShaderSource Include="Reproject.ps.slang" />
     <ShaderSource Include="SSGAFCommon.slang" />

@@ -2,8 +2,8 @@ cbuffer PerImageCB
 {
 	Texture2D gPrevNoiseLevel;
 	Texture2D gMotion;
-    float gThreshold2spp;
-    float gThreshold3spp;
+    float gSmoothstepMin;
+    float gSmoothstepMax;
     bool gUseAdaptiveSampling;
     uint gFixedSpp;
 }
@@ -46,15 +46,9 @@ PS_OUT main(FullScreenPassVsOut vsOut){
         psOut.outSampleCount = gFixedSpp;
     }
     else if (isReprjValid(iposPrev)) {
-        //psOut.outSampleCount = uint(lerp(1.0, 3.0, smoothstep(t1, t2, gPrevNoiseLevel[iposPrev].r)));
         float noiseLevel = gPrevNoiseLevel[iposPrev].r;
-        if(noiseLevel<gThreshold2spp){
-            psOut.outSampleCount = 1;
-        }else if(noiseLevel<gThreshold3spp){
-            psOut.outSampleCount = 2;
-        }else{
-            psOut.outSampleCount = 3;
-        }
+        float SmoothstepScale = 10.f;
+        psOut.outSampleCount = uint(SmoothstepScale * smoothstep(gSmoothstepMin, gSmoothstepMax, noiseLevel) + 1.0f);
     } else {
         psOut.outSampleCount = 2;
 	}

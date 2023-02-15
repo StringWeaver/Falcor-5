@@ -40,11 +40,12 @@ const RenderPass::Info SSGAFPass::kInfo { "SSGAFPass", "SSGAF denoising pass for
 namespace {
 // Shader source files
 const char kReprojectShader[] = "RenderPasses/SSGAFPass/Reproject.ps.slang";
-const char kAtrousShader[] = "RenderPasses/SSGAFPass/Atrous.ps.slang";
+const char kSpatialShader[] = "RenderPasses/SSGAFPass/Spatial.ps.slang";
 const char kNoiseLevelShader[] = "RenderPasses/SSGAFPass/NoiseLevel.ps.slang";
 
 // Names of valid entries in the parameter dictionary.
 const char kEnabled[] = "Enabled";
+const char kUseComputeShader[] = "UseComputeShader";
 const char kIterations[] = "Iterations";
 const char kFeedbackIteration[] = "FeedbackIteration";
 const char kReprojectIteration[] = "ReprojectIteration";
@@ -58,6 +59,7 @@ const char kMaxHistoryLength[] = "MaxHistoryLength";
 
 // Input buffer names
 const char kInputBufferIllumination[] = "Illumination";
+const char kInputBufferSpp[] = "PathTracerSampleCount";
 const char kInputNormalRoughnessMaterialID[] = "normWRoughnessMaterialID";
 const char kInputBufferPathLength[] = "PathLength";
 const char kInputBufferMotionVector[] = "MotionVec";
@@ -121,9 +123,9 @@ SSGAFPass::SSGAFPass(const Dictionary& dict)
     }
 
     mpReprojection = FullScreenPass::create(kReprojectShader);
-    mpAtrous = FullScreenPass::create(kAtrousShader);
+    mpSpatial = FullScreenPass::create(kSpatialShader);
     mpNoiseLevel = FullScreenPass::create(kNoiseLevelShader);
-    FALCOR_ASSERT(mpReprojection && mpAtrous && mpNoiseLevel);
+    FALCOR_ASSERT(mpReprojection && mpSpatial && mpNoiseLevel);
 }
 
 Dictionary SSGAFPass::getScriptingDictionary()
@@ -148,6 +150,7 @@ RenderPassReflection SSGAFPass::reflect(const CompileData& compileData)
     RenderPassReflection reflector;
 
     reflector.addInput(kInputBufferIllumination, "Radiance");
+    reflector.addInput(kInputBufferSpp , "SampleCount");
     reflector.addInput(kInputNormalRoughnessMaterialID, "World normal, roughness, and material ID");
     reflector.addInput(kInputBufferPathLength, "PathLength");
     reflector.addInput(kInputBufferMotionVector, "Motion vectors");
@@ -187,7 +190,7 @@ void SSGAFPass::compile(RenderContext* pRenderContext, const CompileData& compil
         Fbo::Desc desc;
         desc.setSampleCount(0);
         mpReprojFbo = Fbo::create2D(dim.x, dim.y, desc);
-        mpAtrousFbo = Fbo::create2D(dim.x, dim.y, desc);
+        mpSpatialFbo = Fbo::create2D(dim.x, dim.y, desc);
         mpNoiseLevelFbo = Fbo::create2D(dim.x, dim.y, desc);
     }
 
@@ -197,6 +200,7 @@ void SSGAFPass::compile(RenderContext* pRenderContext, const CompileData& compil
 void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderData)
 {
     Texture::SharedPtr pIlluminationTexture = renderData[kInputBufferIllumination]->asTexture();
+    Texture::SharedPtr pInputSppTexture = renderData[kInputBufferSpp]->asTexture();
     Texture::SharedPtr pNormalRoughnessMaterialIDTexture = renderData[kInputNormalRoughnessMaterialID]->asTexture();
     Texture::SharedPtr pPathLengthTexture = renderData[kInputBufferPathLength]->asTexture();
     Texture::SharedPtr pMotionVectorTexture = renderData[kInputBufferMotionVector]->asTexture();
@@ -233,7 +237,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
         // the value of mFeedbackIteration), save the filtered illumination for
         // next time into mpFilteredPastFbo.
 
-        auto spatialPassVars = mpAtrous["PerImageCB"];
+        auto spatialPassVars = mpSpatial["PerImageCB"];
         spatialPassVars["gPathLength"] = pPathLengthTexture;
         spatialPassVars["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
         spatialPassVars["gPhiXY"] = mPhiXY;
@@ -245,7 +249,6 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
         bool isFirstPass = true;
         // const std::array<const int2, 4> patternSequence = { int2(0,1), int2(1,1), int2(0,1), int2(-1,1) };
         // mPatternSequenceIndex = (mPatternSequenceIndex + 1) % patternSequence.size();
-        int2 pattern = int2(0, 1);
         for (int i = -1; i < mFilterIterations; i++) {
             bool isLastIteration = (i == mFilterIterations - 1);
             bool isReprojectIter = (i == std::min(mReprojectIteration - 1, mFilterIterations - 1));
@@ -257,15 +260,19 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                     bool isLastPass = isLastIteration && !isReprojectIter && j == 1;
                     spatialPassVars["gIllumination"] = pPrevIterIllumTexture;
                     spatialPassVars["gValidSpp"] = pPrevIterValidSppTexture;
-                    spatialPassVars["gPattern"] = pattern << i;
-                    pattern = int2(pattern.y, -pattern.x);
+                    spatialPassVars["gInputSpp"] = pInputSppTexture;
+                    if(j == 0){
+                        spatialPassVars["gPattern"] = int2(0, 1) << i;
+                    }else{
+                        spatialPassVars["gPattern"] = int2(1, 0) << i;
+                    }
                     spatialPassVars["gIteration"] = i;
                     spatialPassVars["gIsFirstPass"] = isFirstPass;
                     isFirstPass = false;
-                    mpAtrousFbo->attachColorTarget(pCurrIterIllumTexture, 0);
-                    mpAtrousFbo->attachColorTarget(pCurrIterValidSppTexture, 1);
+                    mpSpatialFbo->attachColorTarget(pCurrIterIllumTexture, 0);
+                    mpSpatialFbo->attachColorTarget(pCurrIterValidSppTexture, 1);
 
-                    mpAtrous->execute(pRenderContext, mpAtrousFbo);
+                    mpSpatial->execute(pRenderContext, mpSpatialFbo);
                     std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
                     std::swap(pCurrIterValidSppTexture, pPrevIterValidSppTexture);
                 }
@@ -282,6 +289,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                 reprojPassVars["gMotion"] = pMotionVectorTexture;
                 reprojPassVars["gIllumination"] = pPrevIterIllumTexture;
                 reprojPassVars["gValidSpp"] = pPrevIterValidSppTexture;
+                reprojPassVars["gInputSpp"] = pInputSppTexture;
                 reprojPassVars["gPrevIllum"] = pPrevFrameIllumTexture;
                 reprojPassVars["gPrevHistoryLength"] = pPrevHistoryLengthTexture;
                 reprojPassVars["gPrevFrameValidSpp"] = pPrevFrameValidSppTexture;
@@ -333,7 +341,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
 
 void SSGAFPass::clearBuffers(RenderContext* pRenderContext, const RenderData& renderData)
 {
-    pRenderContext->clearFbo(mpAtrousFbo.get(), float4(0), 1.0f, 0, FboAttachmentType::All);
+    pRenderContext->clearFbo(mpSpatialFbo.get(), float4(0), 1.0f, 0, FboAttachmentType::All);
     pRenderContext->clearFbo(mpReprojFbo.get(), float4(0), 1.0f, 0, FboAttachmentType::All);
 
     pRenderContext->clearTexture(renderData[kInternalBuffersPreviousPathLength]->asTexture().get());
@@ -356,6 +364,7 @@ void SSGAFPass::renderUI(Gui::Widgets& widget)
 {
     int dirty = 0;
     dirty |= (int)widget.checkbox("Enable SVGF", mFilterEnabled);
+    dirty |= (int)widget.checkbox("Use compute shader for spatial filtering", mUseComputeShader);
 
     widget.text("");
     widget.text("Number of filter iterations.  Which");
@@ -364,6 +373,7 @@ void SSGAFPass::renderUI(Gui::Widgets& widget)
     dirty |= (int)widget.var("Reproject Iteration", mReprojectIteration, 0, mFilterIterations, 1);
     dirty |= (int)widget.var("Feedback Iteration", mFeedbackIteration, 0, mFilterIterations, 1);
 
+    
     widget.text("");
     widget.text("Contol edge stopping on bilateral fitler");
     dirty |= (int)widget.var("For XY", mPhiXY, 0.5f, 1000.0f, 0.01f);

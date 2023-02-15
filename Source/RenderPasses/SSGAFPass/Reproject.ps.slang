@@ -43,6 +43,7 @@ cbuffer PerImageCB
     Texture2D<float2>   gMotion;
     Texture2D<float4> gIllumination;
     Texture2D<float> gValidSpp;
+    Texture2D<uint> gInputSpp;
     Texture2D<float4> gPrevIllum;
     Texture2D<float2> gPathLength;
     Texture2D<float2> gPrevPathLength;
@@ -65,7 +66,7 @@ bool isReprjValid(int2 iposPrev,int2 ipos)
     float Z = gPathLength[ipos].x;
     float prevZ = gPrevPathLength[iposPrev].x;
     // check if deviation of depths is acceptable
-    if (abs(prevZ - Z) >  gPhiDepth*  3.0) return false;
+    if (abs(prevZ - Z) >  gPhiDepth) return false;
 
     return true;
 }
@@ -113,7 +114,7 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     const int2 ipos = posH.xy;
     PS_OUT psOut;
     float4 newIllumination = gIllumination[ipos];
-    float newSpp = gIsFirstPass ? 1.f : gValidSpp[ipos];
+    float newSpp = gIsFirstPass ? float(gInputSpp[ipos]) : gValidSpp[ipos];
     float historyLength;
     // Workaround path tracer bugs. TODO: remove this when we can.
     if (isNaN(newIllumination.x) || isNaN(newIllumination.y) || isNaN(newIllumination.z))
