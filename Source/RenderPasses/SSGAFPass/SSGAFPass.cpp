@@ -41,6 +41,7 @@ namespace {
 // Shader source files
 const char kReprojectShader[] = "RenderPasses/SSGAFPass/Reproject.ps.slang";
 const char kSpatialShader[] = "RenderPasses/SSGAFPass/Spatial.ps.slang";
+const char kSpatialComputeShader[] = "RenderPasses/SSGAFPass/Spatial.cs.slang";
 const char kNoiseLevelShader[] = "RenderPasses/SSGAFPass/NoiseLevel.ps.slang";
 
 // Names of valid entries in the parameter dictionary.
@@ -124,8 +125,21 @@ SSGAFPass::SSGAFPass(const Dictionary& dict)
 
     mpReprojection = FullScreenPass::create(kReprojectShader);
     mpSpatial = FullScreenPass::create(kSpatialShader);
+    auto groupSize = "256";
+    auto spatialHorizontalDefineList = Program::DefineList();
+    spatialHorizontalDefineList["GROUPSIZE"] = groupSize;
+    spatialHorizontalDefineList["GROUPSIZE_X"] = groupSize;
+    spatialHorizontalDefineList["GROUPSIZE_Y"] = "1";
+    auto spatialVerticalDefineList = Program::DefineList();
+    spatialVerticalDefineList["GROUPSIZE"] = groupSize;
+    spatialVerticalDefineList["GROUPSIZE_X"] = "1";
+    spatialVerticalDefineList["GROUPSIZE_Y"] = groupSize;
+    mpSpatialHorizontal = ComputePass::create(kSpatialComputeShader, "main", spatialHorizontalDefineList, false);
+    mpSpatialVertical = ComputePass::create(kSpatialComputeShader, "main", spatialVerticalDefineList, false);
+    mpSpatialHorizontal->setVars(nullptr);
+    mpSpatialVertical->setVars(nullptr);
     mpNoiseLevel = FullScreenPass::create(kNoiseLevelShader);
-    FALCOR_ASSERT(mpReprojection && mpSpatial && mpNoiseLevel);
+    FALCOR_ASSERT(mpReprojection && mpSpatial && mpSpatialHorizontal && mpSpatialVertical && mpNoiseLevel);
 }
 
 Dictionary SSGAFPass::getScriptingDictionary()
@@ -160,16 +174,16 @@ RenderPassReflection SSGAFPass::reflect(const CompileData& compileData)
         .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
     reflector.addInternal(kInternalBufferPreviousLighting, "Previous Filtered Lighting")
         .format(ResourceFormat::RGBA32Float)
-        .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
+        .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource | Resource::BindFlags::UnorderedAccess);
     reflector.addInternal(kInternalBufferPrevFrameValidSpp, kInternalBufferPrevFrameValidSpp)
         .format(ResourceFormat::R32Float)
         .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
     reflector.addInternal(kInternalBufferValidSpp0, kInternalBufferValidSpp0)
         .format(ResourceFormat::R32Float)
-        .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
+        .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource | Resource::BindFlags::UnorderedAccess);
     reflector.addInternal(kInternalBufferValidSpp1, kInternalBufferValidSpp1)
         .format(ResourceFormat::R32Float)
-        .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
+        .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource | Resource::BindFlags::UnorderedAccess);
     reflector.addInternal(kInternalBufferHistoryLength0, kInternalBufferHistoryLength0)
         .format(ResourceFormat::R16Float)
         .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
@@ -185,13 +199,13 @@ RenderPassReflection SSGAFPass::reflect(const CompileData& compileData)
 
 void SSGAFPass::compile(RenderContext* pRenderContext, const CompileData& compileData)
 {
-    uint2 dim = compileData.defaultTexDims;
+    mFrameDim = compileData.defaultTexDims;
     {
         Fbo::Desc desc;
         desc.setSampleCount(0);
-        mpReprojFbo = Fbo::create2D(dim.x, dim.y, desc);
-        mpSpatialFbo = Fbo::create2D(dim.x, dim.y, desc);
-        mpNoiseLevelFbo = Fbo::create2D(dim.x, dim.y, desc);
+        mpReprojFbo = Fbo::create2D(mFrameDim.x, mFrameDim.y, desc);
+        mpSpatialFbo = Fbo::create2D(mFrameDim.x, mFrameDim.y, desc);
+        mpNoiseLevelFbo = Fbo::create2D(mFrameDim.x, mFrameDim.y, desc);
     }
 
     mBuffersNeedClear = true;
@@ -237,14 +251,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
         // the value of mFeedbackIteration), save the filtered illumination for
         // next time into mpFilteredPastFbo.
 
-        auto spatialPassVars = mpSpatial["PerImageCB"];
-        spatialPassVars["gPathLength"] = pPathLengthTexture;
-        spatialPassVars["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
-        spatialPassVars["gPhiXY"] = mPhiXY;
-        spatialPassVars["gPhiColor"] = mPhiColor;
-        spatialPassVars["gPhiNormal"] = mPhiNormal;
-        spatialPassVars["gPhiDepth"] = mPhiDepth;
-        spatialPassVars["gIgnorePhiColorSampleCountThreshold"] = mIgnorePhiColorSampleCountThreshold;
+        
 
         bool isFirstPass = true;
         // const std::array<const int2, 4> patternSequence = { int2(0,1), int2(1,1), int2(0,1), int2(-1,1) };
@@ -257,22 +264,38 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
             // Spatial Accumulation
             if (i >= 0) {
                 for (int j = 0; j < 2; j++) {
+                    auto pSpatialComputePass = j == 0 ? mpSpatialVertical : mpSpatialHorizontal;
+                    ShaderVar spatialPassCB = mUseComputeShader ? pSpatialComputePass["PerImageCB"] : mpSpatial["PerImageCB"];
+                    spatialPassCB["gPattern"] = (j==0 ? int2(0, 1) : int2(1, 0)) << i;
+                    spatialPassCB["gPhiXY"] = mPhiXY;
+                    spatialPassCB["gPhiColor"] = mPhiColor;
+                    spatialPassCB["gPhiNormal"] = mPhiNormal;
+                    spatialPassCB["gPhiDepth"] = mPhiDepth;
+                    spatialPassCB["gIgnorePhiColorSampleCountThreshold"] = mIgnorePhiColorSampleCountThreshold;
                     bool isLastPass = isLastIteration && !isReprojectIter && j == 1;
-                    spatialPassVars["gIllumination"] = pPrevIterIllumTexture;
-                    spatialPassVars["gValidSpp"] = pPrevIterValidSppTexture;
-                    spatialPassVars["gInputSpp"] = pInputSppTexture;
-                    if(j == 0){
-                        spatialPassVars["gPattern"] = int2(0, 1) << i;
-                    }else{
-                        spatialPassVars["gPattern"] = int2(1, 0) << i;
-                    }
-                    spatialPassVars["gIteration"] = i;
-                    spatialPassVars["gIsFirstPass"] = isFirstPass;
+                    spatialPassCB["gIteration"] = i;
+                    spatialPassCB["gIsFirstPass"] = isFirstPass;
                     isFirstPass = false;
-                    mpSpatialFbo->attachColorTarget(pCurrIterIllumTexture, 0);
-                    mpSpatialFbo->attachColorTarget(pCurrIterValidSppTexture, 1);
-
-                    mpSpatial->execute(pRenderContext, mpSpatialFbo);
+                    if(mUseComputeShader){
+                        pSpatialComputePass["gPathLength"] = pPathLengthTexture;
+                        pSpatialComputePass["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
+                        pSpatialComputePass["gIllumination"] = pPrevIterIllumTexture;
+                        pSpatialComputePass["gValidSpp"] = pPrevIterValidSppTexture;
+                        pSpatialComputePass["gInputSpp"] = pInputSppTexture;
+                        pSpatialComputePass["gOutIllumination"] = pCurrIterIllumTexture;
+                        pSpatialComputePass["gOutValidSpp"] = pCurrIterValidSppTexture;
+                        pSpatialComputePass->execute(pRenderContext, mFrameDim.x, mFrameDim.y);
+                    }else{
+                        spatialPassCB["gPathLength"] = pPathLengthTexture;
+                        spatialPassCB["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
+                        spatialPassCB["gIllumination"] = pPrevIterIllumTexture;
+                        spatialPassCB["gValidSpp"] = pPrevIterValidSppTexture;
+                        spatialPassCB["gInputSpp"] = pInputSppTexture;
+                        mpSpatialFbo->attachColorTarget(pCurrIterIllumTexture, 0);
+                        mpSpatialFbo->attachColorTarget(pCurrIterValidSppTexture, 1);
+                        mpSpatial->execute(pRenderContext, mpSpatialFbo);
+                    }
+                    
                     std::swap(pCurrIterIllumTexture, pPrevIterIllumTexture);
                     std::swap(pCurrIterValidSppTexture, pPrevIterValidSppTexture);
                 }
