@@ -61,7 +61,7 @@ bool isReprjValid(int2 iposPrev,int2 ipos)
     const int2 imageDim = getTextureDims(gIllumination, 0);
 
     // check whether reprojected pixel is inside of the screen
-    if (any(iposPrev < int2(0, 0)) || any(iposPrev >= imageDim)) return false;
+    if (!isInsideScreen(iposPrev,imageDim)) return false;
 
     float Z = gPathLength[ipos].x;
     float prevZ = gPrevPathLength[iposPrev].x;

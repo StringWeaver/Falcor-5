@@ -23,39 +23,52 @@ Texture2D<float4> gNormalRoughnessMaterialID;
 RWTexture2D<float4> gOutIllumination;
 RWTexture2D<float> gOutValidSpp;
 
-groupshared float4 gIlluminationCache[GROUPSIZE];
-groupshared float2 gNormalCache[GROUPSIZE];
-groupshared float gPathLengthCache[GROUPSIZE];
-groupshared float gValidSppCache[GROUPSIZE];
+groupshared float4 gIlluminationCache[GROUPSIZE + 2 * SPATIAL_RADIUS];
+groupshared float2 gNormalCache[GROUPSIZE + 2 * SPATIAL_RADIUS];
+groupshared float gPathLengthCache[GROUPSIZE + 2 * SPATIAL_RADIUS];
+groupshared float gValidSppCache[GROUPSIZE + 2 * SPATIAL_RADIUS];
+int getCacheIndex(int thid) {
+    return thid + SPATIAL_RADIUS; //right shift
+}
 
 [numthreads(GROUPSIZE_X, GROUPSIZE_Y, 1)]
 void main(uint3 dispatchThreadId: SV_DispatchThreadID, uint3 groupThreadID: SV_GroupThreadID)
 {
     int thid = max(groupThreadID.x, groupThreadID.y);
+    int cacheIndex = getCacheIndex(thid);
     const int2 ipos = int2(dispatchThreadId.xy);
     // constant samplers to prevent the compiler from generating code which
     // fetches the sampler descriptor from memory for each texture access
-
-    const float zCenter = gPathLength[ipos].x;
-    if (zCenter <= 0)
-    {
-        // not a valid depth => must be envmap => do not filter
-        gOutIllumination[ipos] = float4(0.0);
-        gOutValidSpp[ipos] = 0.0f;
-        return;
-    }
     const int2 screenSize = getTextureDims(gIllumination, 0);
+    const float zCenter = gPathLength[ipos].x;
     float4 illuminationCenter = gIllumination[ipos];
-    // float validSampleCountCenter = gHistoryLength[ipos].x;
     const float illuminationLuminanceCenter = luminance(illuminationCenter.rgb);
     const float sppCenter = gIsFirstPass ? float(gInputSpp[ipos]) : gValidSpp[ipos];
     const float2 packedNCenter = gNormalRoughnessMaterialID[ipos].xy;
     const float3 nCenter = oct_to_ndir_unorm(packedNCenter);
 
-    gIlluminationCache[thid] = illuminationCenter;
-    gNormalCache[thid] = packedNCenter;
-    gPathLengthCache[thid] = zCenter;
-    gValidSppCache[thid] = sppCenter;
+    gPathLengthCache[cacheIndex] = zCenter;
+    gIlluminationCache[cacheIndex] = illuminationCenter;
+    gValidSppCache[cacheIndex] = sppCenter;
+    gNormalCache[cacheIndex] = packedNCenter;
+
+    const int left = thid - SPATIAL_RADIUS;
+    const int leftCacheIndex = getCacheIndex(left);
+    if (left < 0 && isInsideScreen(ipos - SPATIAL_RADIUS * gPattern,screenSize)) {
+        gPathLengthCache[leftCacheIndex] = gPathLength[ipos - SPATIAL_RADIUS * gPattern].x;
+        gIlluminationCache[leftCacheIndex] = gIllumination[ipos - SPATIAL_RADIUS * gPattern];
+        gValidSppCache[leftCacheIndex] = gIsFirstPass ? float(gInputSpp[ipos - SPATIAL_RADIUS * gPattern]) : gValidSpp[ipos - SPATIAL_RADIUS * gPattern];
+        gNormalCache[leftCacheIndex] = gNormalRoughnessMaterialID[ipos - SPATIAL_RADIUS * gPattern].xy;
+    }
+
+    const int right = thid + SPATIAL_RADIUS;
+    const int rightCacheIndex = getCacheIndex(right);
+    if (right >= GROUPSIZE && isInsideScreen(ipos + SPATIAL_RADIUS * gPattern, screenSize)) {
+        gPathLengthCache[rightCacheIndex] = gPathLength[ipos + SPATIAL_RADIUS * gPattern].x;
+        gIlluminationCache[rightCacheIndex] = gIllumination[ipos + SPATIAL_RADIUS * gPattern];
+        gValidSppCache[rightCacheIndex] = gIsFirstPass ? float(gInputSpp[ipos + SPATIAL_RADIUS * gPattern]) : gValidSpp[ipos + SPATIAL_RADIUS * gPattern];
+        gNormalCache[rightCacheIndex] = gNormalRoughnessMaterialID[ipos + SPATIAL_RADIUS * gPattern].xy;
+    }
 
     // explicitly store/accumulate center pixel with weight 1 to prevent issues
     // with the edge-stopping functions
@@ -63,26 +76,21 @@ void main(uint3 dispatchThreadId: SV_DispatchThreadID, uint3 groupThreadID: SV_G
     float4 sumIllumination = sppCenter * illuminationCenter;
     int2 dxdy = gPattern;
     GroupMemoryBarrierWithGroupSync();
-    for (int step = 1; step <= 32; step++)
+    for (int step = 1; step <= SPATIAL_RADIUS; step++)
     {
         for (int i = 0; i < 2; i++)
         {
             const int2 p = ipos + dxdy;
-            const bool inside = all(p >= int2(0, 0)) && all(p < screenSize);
-            if (inside) // skip center pixel, it is already accumulated
+            if (isInsideScreen(p,screenSize)) // skip center pixel, it is already accumulated
             {
-                int thidP = i == 0 ? thid + step : thid - step;
-                bool isCached = 0 <= thidP && thidP < GROUPSIZE;
-                const float4 illuminationP = isCached ? gIlluminationCache[thidP] : gIllumination[p];
+                int cacheIndexP = getCacheIndex(i == 0 ? thid + step : thid - step);
+                const float4 illuminationP = gIlluminationCache[cacheIndexP] ;
                 const float illuminationLuminanceP = luminance(illuminationP.rgb);
-                const float zP = isCached ? gPathLengthCache[thidP] : gPathLength[p].x;
-                const float3 nP = oct_to_ndir_unorm(isCached ? gNormalCache[thidP] : gNormalRoughnessMaterialID[p].xy);
+                const float zP = gPathLengthCache[cacheIndexP];
+                const float3 nP = oct_to_ndir_unorm(gNormalCache[cacheIndexP]);
                 float sppP;
-                if (isCached) {
-                    sppP = gValidSppCache[thidP];
-                } else {
-                    sppP = gIsFirstPass ? float(gInputSpp[p]) : gValidSpp[p];
-                }
+                sppP = gValidSppCache[cacheIndexP];
+
                 // compute the edge-stopping functions
                 float phiLIllumination;
                 if (sppCenter >= gIgnorePhiColorSampleCountThreshold && sppP >= gIgnorePhiColorSampleCountThreshold) {

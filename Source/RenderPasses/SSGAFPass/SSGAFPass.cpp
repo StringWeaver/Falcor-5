@@ -122,15 +122,19 @@ SSGAFPass::SSGAFPass(const Dictionary& dict)
         else
             logWarning("Unknown field '{}' in SSGAFPass dictionary.", key);
     }
-
+    auto groupSize = "512";
+    auto spatialRadius = "32";
     mpReprojection = FullScreenPass::create(kReprojectShader);
-    mpSpatial = FullScreenPass::create(kSpatialShader);
-    auto groupSize = "256";
+    auto spatialShaderDefineList = Program::DefineList();
+    spatialShaderDefineList["SPATIAL_RADIUS"] = spatialRadius;
+    mpSpatial = FullScreenPass::create(kSpatialShader,spatialShaderDefineList);
     auto spatialHorizontalDefineList = Program::DefineList();
+    spatialHorizontalDefineList["SPATIAL_RADIUS"] = spatialRadius;
     spatialHorizontalDefineList["GROUPSIZE"] = groupSize;
     spatialHorizontalDefineList["GROUPSIZE_X"] = groupSize;
     spatialHorizontalDefineList["GROUPSIZE_Y"] = "1";
     auto spatialVerticalDefineList = Program::DefineList();
+    spatialVerticalDefineList["SPATIAL_RADIUS"] = spatialRadius;
     spatialVerticalDefineList["GROUPSIZE"] = groupSize;
     spatialVerticalDefineList["GROUPSIZE_X"] = "1";
     spatialVerticalDefineList["GROUPSIZE_Y"] = groupSize;

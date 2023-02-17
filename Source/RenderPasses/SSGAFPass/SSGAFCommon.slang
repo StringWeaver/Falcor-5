@@ -51,6 +51,10 @@ int2 getTextureDims(Texture2D tex, uint mip)
     return int2(w,h);
 }
 
+bool isInsideScreen(int2 ipos, int2 screemDims) {
+    return all(ipos >= int2(0, 0)) && all(ipos < screemDims);
+}
+
 float computeWeight(
     int xx, int yy, float phiXY,
     float depthCenter, float depthP, float phiDepth,
