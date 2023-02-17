@@ -91,7 +91,7 @@ PS_OUT main(FullScreenPassVsOut vsOut) {
                 const float illuminationLuminanceP = luminance(illuminationP.rgb);
                 const float zP = gPathLength[p].x;
                 const float3 nP = oct_to_ndir_unorm(gNormalRoughnessMaterialID[p].xy);
-                float sppP = gIsFirstPass ? float(gInputSpp[ipos]) : gValidSpp[p];
+                float sppP = gIsFirstPass ? float(gInputSpp[p]) : gValidSpp[p];
                 // compute the edge-stopping functions
                 float phiLIllumination;
                 if (sppCenter >= gIgnorePhiColorSampleCountThreshold && sppP >= gIgnorePhiColorSampleCountThreshold) {
