@@ -279,6 +279,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                     bool isLastPass = isLastIteration && !isReprojectIter && j == 1;
                     spatialPassCB["gIteration"] = i;
                     spatialPassCB["gIsFirstPass"] = isFirstPass;
+                    spatialPassCB["gUseAdaptiveFiltering"] = mUseAdaptiveFiltering;
                     isFirstPass = false;
                     if(mUseComputeShader){
                         pSpatialComputePass["gPathLength"] = pPathLengthTexture;
@@ -392,6 +393,7 @@ void SSGAFPass::renderUI(Gui::Widgets& widget)
     int dirty = 0;
     dirty |= (int)widget.checkbox("Enable SVGF", mFilterEnabled);
     dirty |= (int)widget.checkbox("Use compute shader for spatial filtering", mUseComputeShader);
+    dirty |= (int)widget.checkbox("Use Adaptive filtering(must enable adative sampling first)", mUseAdaptiveFiltering);
 
     widget.text("");
     widget.text("Number of filter iterations.  Which");

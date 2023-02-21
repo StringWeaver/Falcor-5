@@ -14,6 +14,7 @@ cbuffer PerImageCB
     float gIgnorePhiColorSampleCountThreshold;
     int gIteration;
     bool gIsFirstPass;
+    bool gUseAdaptiveFiltering;
 };
 Texture2D<float4> gIllumination;
 Texture2D<uint> gInputSpp;
@@ -27,6 +28,7 @@ groupshared float4 gIlluminationCache[GROUPSIZE + 2 * SPATIAL_RADIUS];
 groupshared float2 gNormalCache[GROUPSIZE + 2 * SPATIAL_RADIUS];
 groupshared float gPathLengthCache[GROUPSIZE + 2 * SPATIAL_RADIUS];
 groupshared float gValidSppCache[GROUPSIZE + 2 * SPATIAL_RADIUS];
+groupshared float gInitialSppCache[GROUPSIZE + 2 * SPATIAL_RADIUS];
 int getCacheIndex(int thid) {
     return thid + SPATIAL_RADIUS; //right shift
 }
@@ -43,12 +45,14 @@ void main(uint3 dispatchThreadId: SV_DispatchThreadID, uint3 groupThreadID: SV_G
     const float zCenter = gPathLength[ipos].x;
     float4 illuminationCenter = gIllumination[ipos];
     const float illuminationLuminanceCenter = luminance(illuminationCenter.rgb);
-    const float sppCenter = gIsFirstPass ? float(gInputSpp[ipos]) : gValidSpp[ipos];
+    const float initialSpp = float(gInputSpp[ipos]);
+    const float sppCenter = gIsFirstPass ? initialSpp : gValidSpp[ipos];
     const float2 packedNCenter = gNormalRoughnessMaterialID[ipos].xy;
     const float3 nCenter = oct_to_ndir_unorm(packedNCenter);
 
     gPathLengthCache[cacheIndex] = zCenter;
     gIlluminationCache[cacheIndex] = illuminationCenter;
+    gInitialSppCache[cacheIndex] = initialSpp;
     gValidSppCache[cacheIndex] = sppCenter;
     gNormalCache[cacheIndex] = packedNCenter;
 
@@ -57,7 +61,9 @@ void main(uint3 dispatchThreadId: SV_DispatchThreadID, uint3 groupThreadID: SV_G
     if (left < 0 && isInsideScreen(ipos - SPATIAL_RADIUS * gPattern,screenSize)) {
         gPathLengthCache[leftCacheIndex] = gPathLength[ipos - SPATIAL_RADIUS * gPattern].x;
         gIlluminationCache[leftCacheIndex] = gIllumination[ipos - SPATIAL_RADIUS * gPattern];
-        gValidSppCache[leftCacheIndex] = gIsFirstPass ? float(gInputSpp[ipos - SPATIAL_RADIUS * gPattern]) : gValidSpp[ipos - SPATIAL_RADIUS * gPattern];
+        float initalSpp = float(gInputSpp[ipos - SPATIAL_RADIUS * gPattern]);
+        gInitialSppCache[leftCacheIndex] = initalSpp;
+        gValidSppCache[leftCacheIndex] = gIsFirstPass ? initalSpp : gValidSpp[ipos - SPATIAL_RADIUS * gPattern];
         gNormalCache[leftCacheIndex] = gNormalRoughnessMaterialID[ipos - SPATIAL_RADIUS * gPattern].xy;
     }
 
@@ -66,7 +72,9 @@ void main(uint3 dispatchThreadId: SV_DispatchThreadID, uint3 groupThreadID: SV_G
     if (right >= GROUPSIZE && isInsideScreen(ipos + SPATIAL_RADIUS * gPattern, screenSize)) {
         gPathLengthCache[rightCacheIndex] = gPathLength[ipos + SPATIAL_RADIUS * gPattern].x;
         gIlluminationCache[rightCacheIndex] = gIllumination[ipos + SPATIAL_RADIUS * gPattern];
-        gValidSppCache[rightCacheIndex] = gIsFirstPass ? float(gInputSpp[ipos + SPATIAL_RADIUS * gPattern]) : gValidSpp[ipos + SPATIAL_RADIUS * gPattern];
+        const float initialSpp = float(gInputSpp[ipos + SPATIAL_RADIUS * gPattern]);
+        gInitialSppCache[rightCacheIndex] = initialSpp;
+        gValidSppCache[rightCacheIndex] = gIsFirstPass ? initialSpp : gValidSpp[ipos + SPATIAL_RADIUS * gPattern];
         gNormalCache[rightCacheIndex] = gNormalRoughnessMaterialID[ipos + SPATIAL_RADIUS * gPattern].xy;
     }
 
@@ -98,7 +106,10 @@ void main(uint3 dispatchThreadId: SV_DispatchThreadID, uint3 groupThreadID: SV_G
                 } else {
                     phiLIllumination = 20.0f;
                 }
-                const float wIllumination = sppP * computeWeight(step, 0, gPhiXY, zCenter, zP, gPhiDepth, nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
+                float wIllumination = sppP * computeWeight(step, 0, gPhiXY, zCenter, zP, gPhiDepth, nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
+                if (gUseAdaptiveFiltering) {
+                    wIllumination =  pow(wIllumination, 1.0 / gInitialSppCache[cacheIndexP]);
+                }
                 // const float wIllumination = computeWeightBspline(step, gPhiXY, zCenter, zP, gPhiDepth, nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
                 sumWIllumination += wIllumination;
                 sumIllumination += wIllumination * illuminationP;
