@@ -47,7 +47,7 @@ PS_OUT main(FullScreenPassVsOut vsOut){
     }
     else if (isReprjValid(iposPrev)) {
         float noiseLevel = gPrevNoiseLevel[iposPrev].r;
-        float SmoothstepScale = 10.f;
+        float SmoothstepScale = 5.f;
         psOut.outSampleCount = uint(SmoothstepScale * smoothstep(gSmoothstepMin, gSmoothstepMax, noiseLevel) + 1.0f);
     } else {
         psOut.outSampleCount = 2;

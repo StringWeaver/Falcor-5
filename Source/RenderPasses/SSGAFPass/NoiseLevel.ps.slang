@@ -45,6 +45,13 @@ struct PS_OUT{
     float4 outRadiance : SV_TARGET0;
     float outDbgView : SV_TARGET1;
 }
+float tDistributionInverseCDF975(float degreeOfFreedom) {
+    float a = 1041959638471.35;
+    float b = 1.65075475862341;
+    float c = 2.17792652658284E-07;
+    float d = 1.96;
+    return (a - d) / (1 + pow(degreeOfFreedom / c, b)) + d;
+}
 PS_OUT main(FullScreenPassVsOut vsOut) 
 {
     PS_OUT psOut;
@@ -53,8 +60,9 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     const float3 nCenter = oct_to_ndir_unorm(gNormalRoughnessMaterialID[ipos].xy);
     float o1stMoment = luminance(gIllumination[ipos].rgb);
     float variance = gIllumination[ipos].a - o1stMoment * o1stMoment;
-    float noiseLevel = sqrt(variance / gValidSpp[ipos])/(o1stMoment + 0.1f);
+    float validSpp = gValidSpp[ipos];
+    float noiseLevel = tDistributionInverseCDF975(validSpp) * sqrt(variance / validSpp);
     psOut.outRadiance =  float4(gIllumination[ipos].rgb, noiseLevel);
-    psOut.outDbgView = noiseLevel * gDbgViewScaleFactor;
+    psOut.outDbgView = o1stMoment * gDbgViewScaleFactor;
     return psOut;
 }
