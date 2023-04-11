@@ -37,7 +37,6 @@ cbuffer PerImageCB
     Texture2D gHistoryLength;
     Texture2D gPathLength;
     Texture2D gNormalRoughnessMaterialID;
-    float gMaxHistoryLength;
     float gDbgViewScaleFactor;
     
 };
@@ -63,6 +62,6 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     float validSpp = gValidSpp[ipos];
     float noiseLevel = tDistributionInverseCDF975(validSpp) * sqrt(variance / validSpp);
     psOut.outRadiance =  float4(gIllumination[ipos].rgb, noiseLevel);
-    psOut.outDbgView = o1stMoment * gDbgViewScaleFactor;
+    psOut.outDbgView = noiseLevel * gDbgViewScaleFactor;
     return psOut;
 }

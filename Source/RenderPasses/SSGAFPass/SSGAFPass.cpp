@@ -56,7 +56,7 @@ const char kPhiDepth[] = "PhiDepth";
 const char kPhiColor[] = "PhiColor";
 const char kIgnorePhiColorSampleCountThreshold[] = "IgnorePhiColorSampleCountThreshold";
 const char kPhiNormal[] = "PhiNormal";
-const char kMaxHistoryLength[] = "MaxHistoryLength";
+const char kMaxHistoryLengthInMs[] = "MaxHistoryLengthInMs";
 
 // Input buffer names
 const char kInputBufferIllumination[] = "Illumination";
@@ -117,11 +117,12 @@ SSGAFPass::SSGAFPass(const Dictionary& dict)
             mIgnorePhiColorSampleCountThreshold = value;
         else if (key == kPhiNormal)
             mPhiNormal = value;
-        else if (key == kMaxHistoryLength)
-            mMaxHistoryLength = value;
+        else if (key == kMaxHistoryLengthInMs)
+            mMaxHistoryLengthInMs = value;
         else
             logWarning("Unknown field '{}' in SSGAFPass dictionary.", key);
     }
+    
     auto groupSize = "512";
     auto spatialRadius = "32";
     mpReprojection = FullScreenPass::create(kReprojectShader);
@@ -158,7 +159,7 @@ Dictionary SSGAFPass::getScriptingDictionary()
     dict[kPhiColor] = mPhiColor;
     dict[kIgnorePhiColorSampleCountThreshold] = mIgnorePhiColorSampleCountThreshold;
     dict[kPhiNormal] = mPhiNormal;
-    dict[kMaxHistoryLength] = mMaxHistoryLength;
+    dict[kMaxHistoryLengthInMs] = mMaxHistoryLengthInMs;
     return dict;
 }
 
@@ -325,7 +326,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                 reprojPassVars["gPathLength"] = pPathLengthTexture;
                 reprojPassVars["gPrevPathLength"] = pPrevFramePathLengthTexture;
                 // Setup variables for our reprojection pass
-                reprojPassVars["gMaxHistoryLength"] = mMaxHistoryLength;
+                reprojPassVars["gMaxHistoryLength"] = mMaxHistoryLengthInMs / float(gpFramework->getFrameRate().getAverageFrameTime());
                 reprojPassVars["gPhiDepth"] = mPhiDepth;
                 reprojPassVars["gIsFirstPass"] = isFirstPass;
                 isFirstPass = false;
@@ -347,7 +348,6 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
         noiseLevelPassVars["gIllumination"] = pOutputColorTexture;
         noiseLevelPassVars["gValidSpp"] = pPrevIterValidSppTexture;
         noiseLevelPassVars["gHistoryLength"] = pHistoryLengthTexture;
-        noiseLevelPassVars["gMaxHistoryLength"] = mMaxHistoryLength;
         noiseLevelPassVars["gPathLength"] = pPathLengthTexture;
         noiseLevelPassVars["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
         noiseLevelPassVars["gDbgViewScaleFactor"] = mDbgViewScaleFactor;
@@ -413,8 +413,8 @@ void SSGAFPass::renderUI(Gui::Widgets& widget)
 
     widget.text("");
     widget.text("How much history should be used?");
-    widget.text("    (MaxHistoryLength;  1 = no reuse)");
-    dirty |= (int)widget.var("Max HistoryLength", mMaxHistoryLength, 1.0f, 32.0f, 1.0f);
+    widget.text("    (MaxHistoryLength;  0 = no reuse)");
+    dirty |= (int)widget.var("Max HistoryLength (ms)", mMaxHistoryLengthInMs, 0.0f, 32000.0f, 1.0f);
 
     widget.text("");
     widget.text("Control Debug View");

@@ -27,6 +27,7 @@
  **************************************************************************/
 #pragma once
 #include "Falcor.h"
+
 using namespace Falcor;
 
 class SSGAFPass : public RenderPass
@@ -52,6 +53,7 @@ private:
 
     bool mBuffersNeedClear = false;
 
+
     // SSGAF parameters
     bool    mFilterEnabled       = true;
     int32_t mFilterIterations    = 1;
@@ -63,7 +65,7 @@ private:
     float   mIgnorePhiColorSampleCountThreshold = 25.f;
     float   mPhiNormal           = 128.0f;
     float   mPhiDepth            = 1.f;
-    float   mMaxHistoryLength    = 32.0f;
+    float   mMaxHistoryLengthInMs    = 1000.0f;
     float   mDbgViewScaleFactor = 0.01f;
     bool    mPrevFrameTextureIndex  = 0;
     bool    mUseComputeShader = true;
