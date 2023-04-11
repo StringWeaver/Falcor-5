@@ -43,9 +43,10 @@ namespace {
     const char kInputBufferMotionVector[] = "MotionVec";
     // PathTracer Input buffer names
     const std::string kInputVBuffer = "vbuffer";
-    //Internal buffer names
+    //Output buffer names
     const char kInOutBufferPreviousNoiseLevel[] = "PreviousNoiseLevel";
-    const char kInternalBufferSampleCount[] = "SampleCount";
+    const char kOutputBufferSampleCount[] = "SampleCount";
+    const char kOutputBufferReprojectedNoiseLevel[] = "ReprojectedNoiseLevel";
 
 }
 // Don't remove this. it's required for hot-reload to function properly
@@ -109,8 +110,11 @@ RenderPassReflection SVGFAdaptiveSampling::reflect(const CompileData& compileDat
     reflector.addOutput(kInOutBufferPreviousNoiseLevel, "Previous NoiseLevel")
         .format(ResourceFormat::R16Float)
         .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource | Resource::BindFlags::UnorderedAccess);
-    reflector.addOutput(kInternalBufferSampleCount, "Sample Count")
+    reflector.addOutput(kOutputBufferSampleCount, "Sample Count")
         .format(ResourceFormat::R8Uint)
+        .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
+    reflector.addOutput(kOutputBufferReprojectedNoiseLevel, "Reprojected Noise Level")
+        .format(ResourceFormat::R16Float)
         .bindFlags(Resource::BindFlags::RenderTarget | Resource::BindFlags::ShaderResource);
     return reflector;
 }
@@ -125,11 +129,14 @@ void SVGFAdaptiveSampling::execute(RenderContext* pRenderContext, const RenderDa
 
     auto pMotionVector = renderData[kInputBufferMotionVector]->asTexture();
     auto pPreviousNoiseLevel = renderData[kInOutBufferPreviousNoiseLevel]->asTexture();
-    auto pSampleCount = renderData[kInternalBufferSampleCount]->asTexture();
+    auto pSampleCount = renderData[kOutputBufferSampleCount]->asTexture();
+    auto pReprojectedNoiseLevel = renderData[kOutputBufferReprojectedNoiseLevel]->asTexture();
 
     FALCOR_ASSERT(mpFbo);
     mpFbo->attachColorTarget(pSampleCount, 0); //set sampleCount as render target
-    FALCOR_ASSERT(mpFbo->getWidth() == pSampleCount->getWidth() && mpFbo->getHeight() == pSampleCount->getHeight());
+    mpFbo->attachColorTarget(pReprojectedNoiseLevel, 1);
+    FALCOR_ASSERT(mpFbo->getWidth() == pSampleCount->getWidth() && mpFbo->getHeight() == pSampleCount->getHeight()
+        && mpFbo->getWidth() == pReprojectedNoiseLevel->getWidth() && mpFbo->getHeight() == pReprojectedNoiseLevel->getHeight());
     FALCOR_ASSERT(mpFbo->getWidth() == pPreviousNoiseLevel->getWidth() && mpFbo->getHeight() == pPreviousNoiseLevel->getHeight());
     auto perImageCB = mpSampleCountPass["PerImageCB"];
     perImageCB["gPrevNoiseLevel"] = pPreviousNoiseLevel;

@@ -19,6 +19,7 @@ struct FullScreenPassVsOut
 struct PS_OUT
 {
     uint outSampleCount : SV_TARGET0;
+    float outNoiseLevel : SV_TARGET1;
 };
 int2 getTextureDims(Texture2D tex, uint mip)
 {
@@ -48,9 +49,11 @@ PS_OUT main(FullScreenPassVsOut vsOut){
     else if (isReprjValid(iposPrev)) {
         float noiseLevel = gPrevNoiseLevel[iposPrev].r;
         float SmoothstepScale = 3.f;
+        psOut.outNoiseLevel = half(noiseLevel);
         psOut.outSampleCount = uint(SmoothstepScale * smoothstep(gSmoothstepMin, gSmoothstepMax, noiseLevel) + 1.0f);
     } else {
         psOut.outSampleCount = 2;
-	}
+        psOut.outNoiseLevel = half(1.f);
+    }
 	return psOut;
 }
