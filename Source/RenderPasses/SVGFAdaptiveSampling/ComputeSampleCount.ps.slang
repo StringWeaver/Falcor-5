@@ -43,16 +43,22 @@ PS_OUT main(FullScreenPassVsOut vsOut){
     const float2 posPrev = posH.xy + motion.xy * imageDim;
     const int2 iposPrev = int2(posPrev);
     PS_OUT psOut;
-    if(!gUseAdaptiveSampling){
-        psOut.outSampleCount = gFixedSpp;
-    }
-    else if (isReprjValid(iposPrev)) {
+    if (isReprjValid(iposPrev)) {
         float noiseLevel = gPrevNoiseLevel[iposPrev].r;
         float SmoothstepScale = 3.f;
         psOut.outNoiseLevel = half(noiseLevel);
-        psOut.outSampleCount = uint(SmoothstepScale * smoothstep(gSmoothstepMin, gSmoothstepMax, noiseLevel) + 1.0f);
+        if (gUseAdaptiveSampling) {
+            psOut.outSampleCount = uint(SmoothstepScale * smoothstep(gSmoothstepMin, gSmoothstepMax, noiseLevel) + 1.0f);
+        }
+        else {
+            psOut.outSampleCount = gFixedSpp;
+        }
     } else {
-        psOut.outSampleCount = 2;
+        if (gUseAdaptiveSampling) {
+            psOut.outSampleCount = 2;
+        } else {
+            psOut.outSampleCount = gFixedSpp;
+        }
         psOut.outNoiseLevel = half(1.f);
     }
 	return psOut;

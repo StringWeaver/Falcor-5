@@ -61,6 +61,7 @@ const char kMaxHistoryLengthInMs[] = "MaxHistoryLengthInMs";
 // Input buffer names
 const char kInputBufferIllumination[] = "Illumination";
 const char kInputBufferSpp[] = "PathTracerSampleCount";
+const char kInputBufferNoiseLevel[] = "NoiseLevel";
 const char kInputNormalRoughnessMaterialID[] = "normWRoughnessMaterialID";
 const char kInputBufferPathLength[] = "PathLength";
 const char kInputBufferMotionVector[] = "MotionVec";
@@ -170,6 +171,7 @@ RenderPassReflection SSGAFPass::reflect(const CompileData& compileData)
 
     reflector.addInput(kInputBufferIllumination, "Radiance");
     reflector.addInput(kInputBufferSpp , "SampleCount");
+    reflector.addInput(kInputBufferNoiseLevel, "Noise Level");
     reflector.addInput(kInputNormalRoughnessMaterialID, "World normal, roughness, and material ID");
     reflector.addInput(kInputBufferPathLength, "PathLength");
     reflector.addInput(kInputBufferMotionVector, "Motion vectors");
@@ -220,6 +222,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
 {
     Texture::SharedPtr pIlluminationTexture = renderData[kInputBufferIllumination]->asTexture();
     Texture::SharedPtr pInputSppTexture = renderData[kInputBufferSpp]->asTexture();
+    Texture::SharedPtr pInputNoiseLevelTexture = renderData[kInputBufferNoiseLevel]->asTexture();
     Texture::SharedPtr pNormalRoughnessMaterialIDTexture = renderData[kInputNormalRoughnessMaterialID]->asTexture();
     Texture::SharedPtr pPathLengthTexture = renderData[kInputBufferPathLength]->asTexture();
     Texture::SharedPtr pMotionVectorTexture = renderData[kInputBufferMotionVector]->asTexture();
@@ -280,7 +283,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                     bool isLastPass = isLastIteration && !isReprojectIter && j == 1;
                     spatialPassCB["gIteration"] = i;
                     spatialPassCB["gIsFirstPass"] = isFirstPass;
-                    spatialPassCB["gUseAdaptiveFiltering"] = mUseAdaptiveFiltering;
+                    
                     isFirstPass = false;
                     if(mUseComputeShader){
                         pSpatialComputePass["gPathLength"] = pPathLengthTexture;
@@ -319,6 +322,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                 reprojPassVars["gIllumination"] = pPrevIterIllumTexture;
                 reprojPassVars["gValidSpp"] = pPrevIterValidSppTexture;
                 reprojPassVars["gInputSpp"] = pInputSppTexture;
+                reprojPassVars["gInputNoiseLevel"] = pInputNoiseLevelTexture;
                 reprojPassVars["gPrevIllum"] = pPrevFrameIllumTexture;
                 reprojPassVars["gPrevHistoryLength"] = pPrevHistoryLengthTexture;
                 reprojPassVars["gPrevFrameValidSpp"] = pPrevFrameValidSppTexture;
@@ -329,6 +333,8 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                 reprojPassVars["gMaxHistoryLength"] = mMaxHistoryLengthInMs / float(gpFramework->getFrameRate().getAverageFrameTime());
                 reprojPassVars["gPhiDepth"] = mPhiDepth;
                 reprojPassVars["gIsFirstPass"] = isFirstPass;
+                reprojPassVars["gUseAdaptiveHistoryLength"] = mUseAdaptiveHistoryLength;
+                reprojPassVars["gMaxHistoryLengthStrength"] = mAdaptiveHistoryLengthStrength;
                 isFirstPass = false;
                 mpReprojFbo->attachColorTarget(pCurrIterIllumTexture, 0);
                 mpReprojFbo->attachColorTarget(pCurrIterValidSppTexture, 1);
@@ -393,7 +399,8 @@ void SSGAFPass::renderUI(Gui::Widgets& widget)
     int dirty = 0;
     dirty |= (int)widget.checkbox("Enable SVGF", mFilterEnabled);
     dirty |= (int)widget.checkbox("Use compute shader for spatial filtering", mUseComputeShader);
-    dirty |= (int)widget.checkbox("Use Adaptive filtering(must enable adative sampling first)", mUseAdaptiveFiltering);
+    dirty |= (int)widget.checkbox("Use Adaptive History Length", mUseAdaptiveHistoryLength);
+    dirty |= (int)widget.var("Adaptive History Length Strength", mAdaptiveHistoryLengthStrength, 0.0f, 100000.0f, 0.01f);
 
     widget.text("");
     widget.text("Number of filter iterations.  Which");

@@ -43,6 +43,7 @@ cbuffer PerImageCB
     Texture2D<float2>   gMotion;
     Texture2D<float4> gIllumination;
     Texture2D<float> gValidSpp;
+    Texture2D<half> gInputNoiseLevel;
     Texture2D<uint> gInputSpp;
     Texture2D<float4> gPrevIllum;
     Texture2D<float2> gPathLength;
@@ -52,8 +53,10 @@ cbuffer PerImageCB
     Texture2D<float> gPrevFrameValidSpp;
 
     float gMaxHistoryLength;
+    float gMaxHistoryLengthStrength;
     float gPhiDepth;
     bool gIsFirstPass;
+    bool gUseAdaptiveHistoryLength;
 };
 
 bool isReprjValid(int2 iposPrev,int2 ipos)
@@ -127,9 +130,13 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     float4 prevIllumination;
     float oldSpp;
     bool success = loadPrevData(posH.xy, prevIllumination, oldSpp, historyLength);
-    if (historyLength >= gMaxHistoryLength) {
-        float temporalRetireFactor = (gMaxHistoryLength - 1.f) / historyLength;
-        historyLength = gMaxHistoryLength - 1.f;
+    float adjustedMaxHistoryLength = gMaxHistoryLength;
+    if (gUseAdaptiveHistoryLength) {
+        adjustedMaxHistoryLength *= 1.0 + gMaxHistoryLengthStrength * atan(gInputNoiseLevel[ipos]);
+    }
+    if (historyLength >= adjustedMaxHistoryLength) {
+        float temporalRetireFactor = (adjustedMaxHistoryLength - 1.f) / historyLength;
+        historyLength = adjustedMaxHistoryLength - 1.f;
         oldSpp *= temporalRetireFactor;
     }
     // variance *= computeVarianceScale(16, 16, alpha);

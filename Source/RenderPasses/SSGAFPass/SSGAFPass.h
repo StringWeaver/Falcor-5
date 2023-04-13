@@ -69,7 +69,8 @@ private:
     float   mDbgViewScaleFactor = 0.01f;
     bool    mPrevFrameTextureIndex  = 0;
     bool    mUseComputeShader = true;
-    bool    mUseAdaptiveFiltering = false;
+    bool    mUseAdaptiveHistoryLength = false;
+    float   mAdaptiveHistoryLengthStrength = 1.0f;
     uint2 mFrameDim = uint2(1280,720);
 
     // SSGAF passes

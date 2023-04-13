@@ -47,7 +47,6 @@ cbuffer PerImageCB
     float gIgnorePhiColorSampleCountThreshold;
     int gIteration;
     bool gIsFirstPass;
-    bool gUseAdaptiveFiltering;
 };
 struct PS_OUT
 {
@@ -99,9 +98,6 @@ PS_OUT main(FullScreenPassVsOut vsOut) {
                     phiLIllumination = 20.0f;
                 }
                 float wIllumination = sppP * computeWeight(step, 0, gPhiXY, zCenter, zP, gPhiDepth, nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
-                if (gUseAdaptiveFiltering) {
-                    wIllumination = pow(wIllumination, 1.0 / gInputSpp[p]);
-                }
                 //const float wIllumination = computeWeightBspline(step, gPhiXY, zCenter, zP, gPhiDepth, nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
                 sumWIllumination += wIllumination;
                 sumIllumination += wIllumination * illuminationP;

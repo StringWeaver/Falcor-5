@@ -14,7 +14,6 @@ cbuffer PerImageCB
     float gIgnorePhiColorSampleCountThreshold;
     int gIteration;
     bool gIsFirstPass;
-    bool gUseAdaptiveFiltering;
 };
 Texture2D<float4> gIllumination;
 Texture2D<uint> gInputSpp;
@@ -107,9 +106,6 @@ void main(uint3 dispatchThreadId: SV_DispatchThreadID, uint3 groupThreadID: SV_G
                     phiLIllumination = 20.0f;
                 }
                 float wIllumination = sppP * computeWeight(step, 0, gPhiXY, zCenter, zP, gPhiDepth, nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
-                if (gUseAdaptiveFiltering) {
-                    wIllumination =  pow(wIllumination, 1.0 / gInitialSppCache[cacheIndexP]);
-                }
                 // const float wIllumination = computeWeightBspline(step, gPhiXY, zCenter, zP, gPhiDepth, nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
                 sumWIllumination += wIllumination;
                 sumIllumination += wIllumination * illuminationP;
