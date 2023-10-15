@@ -330,7 +330,12 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                 reprojPassVars["gPathLength"] = pPathLengthTexture;
                 reprojPassVars["gPrevPathLength"] = pPrevFramePathLengthTexture;
                 // Setup variables for our reprojection pass
-                reprojPassVars["gMaxHistoryLength"] = mMaxHistoryLengthInMs / float(gpFramework->getFrameRate().getAverageFrameTime());
+                if (mUseFixedFrameTime) {
+                    reprojPassVars["gMaxHistoryLength"] = mMaxHistoryLengthInMs / mFixedFrameTime;
+                }
+                else {
+                    reprojPassVars["gMaxHistoryLength"] = mMaxHistoryLengthInMs / float(gpFramework->getFrameRate().getAverageFrameTime());                   
+                }
                 reprojPassVars["gPhiDepth"] = mPhiDepth;
                 reprojPassVars["gIsFirstPass"] = isFirstPass;
                 reprojPassVars["gUseAdaptiveHistoryLength"] = mUseAdaptiveHistoryLength;
@@ -422,6 +427,9 @@ void SSGAFPass::renderUI(Gui::Widgets& widget)
     widget.text("How much history should be used?");
     widget.text("    (MaxHistoryLength;  0 = no reuse)");
     dirty |= (int)widget.var("Max HistoryLength (ms)", mMaxHistoryLengthInMs, 0.0f, 32000.0f, 1.0f);
+    dirty |= (int)widget.checkbox("Use a user specified frame time", mUseFixedFrameTime);
+    dirty |= (int)widget.var("frame time", mFixedFrameTime, 1.f, 1000.0f);
+
 
     widget.text("");
     widget.text("Control Debug View");

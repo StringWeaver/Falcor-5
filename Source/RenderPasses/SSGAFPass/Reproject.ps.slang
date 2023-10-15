@@ -130,13 +130,13 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     float4 prevIllumination;
     float oldSpp;
     bool success = loadPrevData(posH.xy, prevIllumination, oldSpp, historyLength);
-    float adjustedMaxHistoryLength = gMaxHistoryLength;
+    float maxHistoryLength = gMaxHistoryLength;
     if (gUseAdaptiveHistoryLength) {
-        adjustedMaxHistoryLength *= 1.0 + gMaxHistoryLengthStrength * atan(gInputNoiseLevel[ipos]);
+        maxHistoryLength *= 1.0 + gMaxHistoryLengthStrength * atan(gInputNoiseLevel[ipos]);
     }
-    if (historyLength >= adjustedMaxHistoryLength) {
-        float temporalRetireFactor = (adjustedMaxHistoryLength - 1.f) / historyLength;
-        historyLength = adjustedMaxHistoryLength - 1.f;
+    if (historyLength >= maxHistoryLength + 1.f) {
+        float temporalRetireFactor = maxHistoryLength / historyLength;
+        historyLength = maxHistoryLength;
         oldSpp *= temporalRetireFactor;
     }
     // variance *= computeVarianceScale(16, 16, alpha);
