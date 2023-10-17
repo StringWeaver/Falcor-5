@@ -55,7 +55,7 @@ cbuffer PerImageCB
     float gMaxHistoryLength;
     float gMaxHistoryLengthStrength;
     float gPhiDepth;
-    bool gIsFirstPass;
+    bool gClearSpp;
     bool gUseAdaptiveHistoryLength;
 };
 
@@ -117,7 +117,7 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     const int2 ipos = posH.xy;
     PS_OUT psOut;
     float4 newIllumination = gIllumination[ipos];
-    float newSpp = gIsFirstPass ? float(gInputSpp[ipos]) : gValidSpp[ipos];
+    float newSpp = gClearSpp ? float(gInputSpp[ipos]) : gValidSpp[ipos];
     float historyLength;
     // Workaround path tracer bugs. TODO: remove this when we can.
     if (isNaN(newIllumination.x) || isNaN(newIllumination.y) || isNaN(newIllumination.z))

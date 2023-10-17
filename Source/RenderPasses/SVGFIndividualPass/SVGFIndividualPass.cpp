@@ -57,7 +57,6 @@ namespace
     const char kMomentsAlpha[] = "MomentsAlpha";
 
     // Input buffer names
-    const char kInputBufferAlbedo[] = "Albedo";
     const char kInputBufferColor[] = "Color";
     const char kInputBufferEmission[] = "Emission";
     const char kInputBufferWorldPosition[] = "WorldPosition";
@@ -147,8 +146,6 @@ a-trous:
 RenderPassReflection SVGFIndividualPass::reflect(const CompileData& compileData)
 {
     RenderPassReflection reflector;
-
-    reflector.addInput(kInputBufferAlbedo, "Albedo");
     reflector.addInput(kInputBufferColor, "Color");
     reflector.addInput(kInputBufferWorldNormal, "World Normal");
     reflector.addInput(kInputBufferPosNormalFwidth, "PositionNormalFwidth");
@@ -183,7 +180,6 @@ void SVGFIndividualPass::compile(RenderContext* pRenderContext, const CompileDat
 
 void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData& renderData)
 {
-    Texture::SharedPtr pAlbedoTexture = renderData[kInputBufferAlbedo]->asTexture();
     Texture::SharedPtr pColorTexture = renderData[kInputBufferColor]->asTexture();
     Texture::SharedPtr pEmissionTexture = renderData[kInputBufferEmission]->asTexture();
     Texture::SharedPtr pWorldPositionTexture = renderData[kInputBufferWorldPosition]->asTexture();
@@ -197,9 +193,6 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
     Texture::SharedPtr pOutputDebugView1Texture = renderData[kOutputBufferDebugView1]->asTexture();
     Texture::SharedPtr pOutputDebugView2Texture = renderData[kOutputBufferDebugView2]->asTexture();
 
-    FALCOR_ASSERT(mpFilteredIlluminationFbo &&
-           mpFilteredIlluminationFbo->getWidth() == pAlbedoTexture->getWidth() &&
-           mpFilteredIlluminationFbo->getHeight() == pAlbedoTexture->getHeight());
 
     if (mBuffersNeedClear)
     {
@@ -219,7 +212,7 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
         // per-pixel history length in mpCurReprojFbo.
         Texture::SharedPtr pPrevLinearZAndNormalTexture =
             renderData[kInternalBufferPreviousLinearZAndNormal]->asTexture();
-        computeReprojection(pRenderContext, pAlbedoTexture, pColorTexture, pEmissionTexture,
+        computeReprojection(pRenderContext, pColorTexture, pEmissionTexture,
                             pMotionVectorTexture, pPosNormalFwidthTexture,
                             pPrevLinearZAndNormalTexture);
 
@@ -232,11 +225,10 @@ void SVGFIndividualPass::execute(RenderContext* pRenderContext, const RenderData
         // in mpPingPongFbo[0].  Along the way (or at the end, depending on
         // the value of mFeedbackTap), save the filtered illumination for
         // next time into mpFilteredPastFbo.
-        computeAtrousDecomposition(pRenderContext, pAlbedoTexture);
+        computeAtrousDecomposition(pRenderContext);
 
         // Compute albedo * filtered illumination and add emission back in.
         auto perImageCB = mpFinalModulate["PerImageCB"];
-        perImageCB["gAlbedo"] = pAlbedoTexture;
         perImageCB["gEmission"] = pEmissionTexture;
         perImageCB["gIllumination"] = mpPingPongFbo[0]->getColorTexture(0);
         perImageCB["gMoments"] = mpCurReprojFbo->getColorTexture(1);
@@ -325,7 +317,7 @@ void SVGFIndividualPass::computeLinearZAndNormal(RenderContext* pRenderContext, 
     mpPackLinearZAndNormal->execute(pRenderContext, mpLinearZAndNormalFbo);
 }
 
-void SVGFIndividualPass::computeReprojection(RenderContext* pRenderContext, Texture::SharedPtr pAlbedoTexture,
+void SVGFIndividualPass::computeReprojection(RenderContext* pRenderContext,
                                    Texture::SharedPtr pColorTexture, Texture::SharedPtr pEmissionTexture,
                                    Texture::SharedPtr pMotionVectorTexture,
                                    Texture::SharedPtr pPositionNormalFwidthTexture,
@@ -337,7 +329,6 @@ void SVGFIndividualPass::computeReprojection(RenderContext* pRenderContext, Text
     perImageCB["gMotion"]        = pMotionVectorTexture;
     perImageCB["gColor"]         = pColorTexture;
     perImageCB["gEmission"]      = pEmissionTexture;
-    perImageCB["gAlbedo"]        = pAlbedoTexture;
     perImageCB["gPositionNormalFwidth"] = pPositionNormalFwidthTexture;
     perImageCB["gPrevIllum"]     = mpFilteredPastFbo->getColorTexture(0);
     perImageCB["gPrevMoments"]   = mpPrevReprojFbo->getColorTexture(1);
@@ -367,11 +358,9 @@ void SVGFIndividualPass::computeFilteredMoments(RenderContext* pRenderContext)
     mpFilterMoments->execute(pRenderContext, mpPingPongFbo[0]);
 }
 
-void SVGFIndividualPass::computeAtrousDecomposition(RenderContext* pRenderContext, Texture::SharedPtr pAlbedoTexture)
+void SVGFIndividualPass::computeAtrousDecomposition(RenderContext* pRenderContext)
 {
     auto perImageCB = mpAtrous["PerImageCB"];
-
-    perImageCB["gAlbedo"]        = pAlbedoTexture;
     perImageCB["gHistoryLength"] = mpCurReprojFbo->getColorTexture(2);
     perImageCB["gLinearZAndNormal"]       = mpLinearZAndNormalFbo->getColorTexture(0);
 

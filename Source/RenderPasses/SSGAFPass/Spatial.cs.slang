@@ -13,7 +13,7 @@ cbuffer PerImageCB
     float gPhiDepth;
     float gIgnorePhiColorSampleCountThreshold;
     int gIteration;
-    bool gIsFirstPass;
+    bool gClearSpp;
 };
 Texture2D<float4> gIllumination;
 Texture2D<uint> gInputSpp;
@@ -45,7 +45,7 @@ void main(uint3 dispatchThreadId: SV_DispatchThreadID, uint3 groupThreadID: SV_G
     float4 illuminationCenter = gIllumination[ipos];
     const float illuminationLuminanceCenter = luminance(illuminationCenter.rgb);
     const float initialSpp = float(gInputSpp[ipos]);
-    const float sppCenter = gIsFirstPass ? initialSpp : gValidSpp[ipos];
+    const float sppCenter = gClearSpp ? initialSpp : gValidSpp[ipos];
     const float2 packedNCenter = gNormalRoughnessMaterialID[ipos].xy;
     const float3 nCenter = oct_to_ndir_unorm(packedNCenter);
 
@@ -62,7 +62,7 @@ void main(uint3 dispatchThreadId: SV_DispatchThreadID, uint3 groupThreadID: SV_G
         gIlluminationCache[leftCacheIndex] = gIllumination[ipos - SPATIAL_RADIUS * gPattern];
         float initalSpp = float(gInputSpp[ipos - SPATIAL_RADIUS * gPattern]);
         gInitialSppCache[leftCacheIndex] = initalSpp;
-        gValidSppCache[leftCacheIndex] = gIsFirstPass ? initalSpp : gValidSpp[ipos - SPATIAL_RADIUS * gPattern];
+        gValidSppCache[leftCacheIndex] = gClearSpp ? initalSpp : gValidSpp[ipos - SPATIAL_RADIUS * gPattern];
         gNormalCache[leftCacheIndex] = gNormalRoughnessMaterialID[ipos - SPATIAL_RADIUS * gPattern].xy;
     }
 
@@ -73,7 +73,7 @@ void main(uint3 dispatchThreadId: SV_DispatchThreadID, uint3 groupThreadID: SV_G
         gIlluminationCache[rightCacheIndex] = gIllumination[ipos + SPATIAL_RADIUS * gPattern];
         const float initialSpp = float(gInputSpp[ipos + SPATIAL_RADIUS * gPattern]);
         gInitialSppCache[rightCacheIndex] = initialSpp;
-        gValidSppCache[rightCacheIndex] = gIsFirstPass ? initialSpp : gValidSpp[ipos + SPATIAL_RADIUS * gPattern];
+        gValidSppCache[rightCacheIndex] = gClearSpp ? initialSpp : gValidSpp[ipos + SPATIAL_RADIUS * gPattern];
         gNormalCache[rightCacheIndex] = gNormalRoughnessMaterialID[ipos + SPATIAL_RADIUS * gPattern].xy;
     }
 

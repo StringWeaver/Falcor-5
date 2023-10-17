@@ -261,30 +261,31 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
 
         
 
-        bool isFirstPass = true;
+        bool clearSpp = true;
         // const std::array<const int2, 4> patternSequence = { int2(0,1), int2(1,1), int2(0,1), int2(-1,1) };
         // mPatternSequenceIndex = (mPatternSequenceIndex + 1) % patternSequence.size();
-        for (int i = -1; i < mFilterIterations; i++) {
-            bool isLastIteration = (i == mFilterIterations - 1);
-            bool isReprojectIter = (i == std::min(mReprojectIteration - 1, mFilterIterations - 1));
-            bool isFeedbackIter = (i == std::min(mFeedbackIteration - 1, mFilterIterations - 1));
+        // loop 0 is only for temporal filter in case you want to temporal accumutaion ahead of spatial filter
+        for (int i = 0; i <= mFilterIterations; i++) {
+            bool isLastIteration = (i == mFilterIterations);
+            bool isReprojectIter = (i == mReprojectIteration);
+            bool isFeedbackIter = (i == mFeedbackIteration);
 
             // Spatial Accumulation
-            if (i >= 0) {
+            if (i >= 1) {
                 for (int j = 0; j < 2; j++) {
                     auto pSpatialComputePass = j == 0 ? mpSpatialVertical : mpSpatialHorizontal;
                     ShaderVar spatialPassCB = mUseComputeShader ? pSpatialComputePass["PerImageCB"] : mpSpatial["PerImageCB"];
-                    spatialPassCB["gPattern"] = (j==0 ? int2(0, 1) : int2(1, 0)) << i;
+                    spatialPassCB["gPattern"] = (j==0 ? int2(0, 1) : int2(1, 0)) << i - 1;
                     spatialPassCB["gPhiXY"] = mPhiXY;
                     spatialPassCB["gPhiColor"] = mPhiColor;
                     spatialPassCB["gPhiNormal"] = mPhiNormal;
                     spatialPassCB["gPhiDepth"] = mPhiDepth;
                     spatialPassCB["gIgnorePhiColorSampleCountThreshold"] = mIgnorePhiColorSampleCountThreshold;
                     bool isLastPass = isLastIteration && !isReprojectIter && j == 1;
-                    spatialPassCB["gIteration"] = i;
-                    spatialPassCB["gIsFirstPass"] = isFirstPass;
+                    spatialPassCB["gIteration"] = i -1 ;
+                    spatialPassCB["gClearSpp"] = clearSpp;
                     
-                    isFirstPass = false;
+                    clearSpp = false;
                     if(mUseComputeShader){
                         pSpatialComputePass["gPathLength"] = pPathLengthTexture;
                         pSpatialComputePass["gNormalRoughnessMaterialID"] = pNormalRoughnessMaterialIDTexture;
@@ -337,10 +338,10 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
                     reprojPassVars["gMaxHistoryLength"] = mMaxHistoryLengthInMs / float(gpFramework->getFrameRate().getAverageFrameTime());                   
                 }
                 reprojPassVars["gPhiDepth"] = mPhiDepth;
-                reprojPassVars["gIsFirstPass"] = isFirstPass;
+                reprojPassVars["gClearSpp"] = clearSpp;
                 reprojPassVars["gUseAdaptiveHistoryLength"] = mUseAdaptiveHistoryLength;
                 reprojPassVars["gMaxHistoryLengthStrength"] = mAdaptiveHistoryLengthStrength;
-                isFirstPass = false;
+                clearSpp = false;
                 mpReprojFbo->attachColorTarget(pCurrIterIllumTexture, 0);
                 mpReprojFbo->attachColorTarget(pCurrIterValidSppTexture, 1);
                 mpReprojFbo->attachColorTarget(pHistoryLengthTexture, 2);
@@ -402,7 +403,7 @@ void SSGAFPass::clearBuffers(RenderContext* pRenderContext, const RenderData& re
 void SSGAFPass::renderUI(Gui::Widgets& widget)
 {
     int dirty = 0;
-    dirty |= (int)widget.checkbox("Enable SVGF", mFilterEnabled);
+    dirty |= (int)widget.checkbox("Enable", mFilterEnabled);
     dirty |= (int)widget.checkbox("Use compute shader for spatial filtering", mUseComputeShader);
     dirty |= (int)widget.checkbox("Use Adaptive History Length", mUseAdaptiveHistoryLength);
     dirty |= (int)widget.var("Adaptive History Length Strength", mAdaptiveHistoryLengthStrength, 0.0f, 100000.0f, 0.01f);
@@ -411,7 +412,7 @@ void SSGAFPass::renderUI(Gui::Widgets& widget)
     widget.text("Number of filter iterations.  Which");
     widget.text("    iteration feeds into future frames?");
     dirty |= (int)widget.var("Iterations", mFilterIterations, 0, 10, 1);
-    dirty |= (int)widget.var("Reproject Iteration", mReprojectIteration, 0, mFilterIterations, 1);
+    dirty |= (int)widget.var("Reproject Iteration", mReprojectIteration, -1, mFilterIterations, 1);
     dirty |= (int)widget.var("Feedback Iteration", mFeedbackIteration, 0, mFilterIterations, 1);
 
     

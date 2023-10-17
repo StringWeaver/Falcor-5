@@ -37,7 +37,6 @@ def render_graph_DefaultRenderGraph():
     g.addEdge('PathTracer.nrdDiffuseReflectance', 'SSGAFModulateIllumination.diffuseReflectance')
     g.addEdge('SSGAFModulateIllumination.output', 'ToneMapper.src')
     g.addEdge('PathTracer.nrdDiffuseRadianceHitDist', 'SVGFIndividualPass.Color')
-    g.addEdge('PathTracer.nrdDiffuseReflectance', 'SVGFIndividualPass.Albedo')
     g.addEdge('PathTracer.normal', 'SVGFIndividualPass.WorldNormal')
     g.addEdge('GBufferRaster.vbuffer', 'PathTracer.vbuffer')
     g.addEdge('GBufferRaster.pnFwidth', 'SVGFIndividualPass.PositionNormalFwidth')

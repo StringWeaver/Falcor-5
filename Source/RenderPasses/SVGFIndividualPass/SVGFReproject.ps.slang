@@ -42,7 +42,6 @@ cbuffer PerImageCB
     Texture2D   gMotion;
     Texture2D   gPositionNormalFwidth;
     Texture2D   gColor;
-    Texture2D   gAlbedo;
     Texture2D   gEmission;
     Texture2D   gPrevIllum;
     Texture2D   gPrevMoments;
