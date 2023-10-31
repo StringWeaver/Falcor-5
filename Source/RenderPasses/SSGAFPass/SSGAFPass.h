@@ -60,12 +60,12 @@ private:
     int32_t mFeedbackIteration = 1;
     int32_t mReprojectIteration = 1;
     int32_t mPatternSequenceIndex = 0;
-    float   mPhiXY = 20.0f;
+    float   mPhiXY = 15.0f;
     float   mPhiColor            = 1.0f;
-    float   mIgnorePhiColorSampleCountThreshold = 25.f;
+    float   mIgnorePhiColorSampleCountThreshold = 200.f;
     float   mPhiNormal           = 128.0f;
-    float   mPhiDepth            = 1.f;
-    float   mMaxHistoryLengthInMs    = 1000.0f;
+    float   mPhiDepth            = 0.02f;
+    float   mMaxHistoryLengthInMs    = 500.0f;
     float   mDbgViewScaleFactor = 0.01f;
     bool    mPrevFrameTextureIndex  = 0;
     bool    mUseComputeShader = true;

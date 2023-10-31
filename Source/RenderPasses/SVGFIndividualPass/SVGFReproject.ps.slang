@@ -62,7 +62,7 @@ bool isReprjValid(int2 coord, float Z, float Zprev, float fwidthZ, float3 normal
     if (any(coord < int2(1,1)) || any(coord > imageDim - int2(1,1))) return false;
 
     // check if deviation of depths is acceptable
-    if (abs(Zprev - Z) / (fwidthZ + 1e-2f) > 10.f) return false;
+    if (abs(Zprev - Z) / (fwidthZ + 1e-2f) > 50.f) return false;
 
     // check normals for compatibility
     if (distance(normal, normalPrev) / (fwidthNormal + 1e-2) > 16.0) return false;

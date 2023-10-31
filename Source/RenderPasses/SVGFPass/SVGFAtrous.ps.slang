@@ -119,12 +119,12 @@ float4 main(FullScreenPassVsOut vsOut) : SV_TARGET0
                 const float3 nP = oct_to_ndir_snorm(gLinearZAndNormal[p].zw);
 
                 // compute the edge-stopping functions
-                const float2 w = computeWeight(
+                const float w = computeWeight(
                     zCenter.x, zP, phiDepth * length(float2(xx, yy)),
                     nCenter, nP, gPhiNormal,
                     lIlluminationCenter, lIlluminationP, phiLIllumination);
 
-                const float wIllumination = w.x * kernel;
+                const float wIllumination = w * kernel;
 
                 // alpha channel contains the variance, therefore the weights need to be squared, see paper for the formula
                 sumWIllumination  += wIllumination;
