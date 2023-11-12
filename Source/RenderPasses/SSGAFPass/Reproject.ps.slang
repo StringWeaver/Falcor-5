@@ -134,14 +134,15 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     if (gUseAdaptiveHistoryLength) {
         maxHistoryLength *= 1.0 + gMaxHistoryLengthStrength * atan(gInputNoiseLevel[ipos]);
     }
-    if (historyLength >= maxHistoryLength + 1.f) {
-        float temporalRetireFactor = maxHistoryLength / historyLength;
+    if (historyLength > maxHistoryLength) {
         historyLength = maxHistoryLength;
-        oldSpp *= temporalRetireFactor;
     }
     // variance *= computeVarianceScale(16, 16, alpha);
 
     // temporal integration of illumination
+    float alpha = 2/(historyLength+2);
+    oldSpp *= (1-alpha);
+    newSpp *=alpha;
     float sumSpp = oldSpp + newSpp;
     newIllumination =  (newSpp * newIllumination +  oldSpp * prevIllumination) / sumSpp;
     psOut.OutIllumination = newIllumination;

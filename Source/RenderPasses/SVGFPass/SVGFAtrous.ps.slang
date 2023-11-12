@@ -86,7 +86,7 @@ float4 main(FullScreenPassVsOut vsOut) : SV_TARGET0
     // number of temporally integrated pixels
     const float historyLength = gHistoryLength[ipos].x;
 
-    const float2 zCenter = gLinearZAndNormal[ipos].xy;
+    const float2 zCenter = gLinearZAndNormal[ipos].xy; //zCenter.x--z, zCenter.y---dz
     if (zCenter.x < 0)
     {
         // not a valid depth => must be envmap => do not filter

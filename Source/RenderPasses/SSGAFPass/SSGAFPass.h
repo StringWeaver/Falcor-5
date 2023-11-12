@@ -59,7 +59,7 @@ private:
     int32_t mFilterIterations    = 1;
     int32_t mFeedbackIteration = 1;
     int32_t mReprojectIteration = 1;
-    int32_t mPatternSequenceIndex = 0;
+    int32_t mFrameCount = 0;
     float   mPhiXY = 15.0f;
     float   mPhiColor            = 1.0f;
     float   mIgnorePhiColorSampleCountThreshold = 200.f;

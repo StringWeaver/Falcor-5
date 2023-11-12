@@ -273,9 +273,9 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
             // Spatial Accumulation
             if (i >= 1) {
                 for (int j = 0; j < 2; j++) {
-                    auto pSpatialComputePass = j == 0 ? mpSpatialVertical : mpSpatialHorizontal;
+                    auto pSpatialComputePass = j^(mFrameCount%2) ? mpSpatialVertical : mpSpatialHorizontal;
                     ShaderVar spatialPassCB = mUseComputeShader ? pSpatialComputePass["PerImageCB"] : mpSpatial["PerImageCB"];
-                    spatialPassCB["gPattern"] = (j==0 ? int2(0, 1) : int2(1, 0)) << i - 1;
+                    spatialPassCB["gPattern"] = (j ^ (mFrameCount % 2) ? int2(0, 1) : int2(1, 0)) << i - 1;
                     spatialPassCB["gPhiXY"] = mPhiXY;
                     spatialPassCB["gPhiColor"] = mPhiColor;
                     spatialPassCB["gPhiNormal"] = mPhiNormal;
@@ -377,6 +377,7 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
     } else {
         pRenderContext->blit(pIlluminationTexture->getSRV(), pOutputColorTexture->getRTV());
     }
+    mFrameCount++;
 }
 
 void SSGAFPass::clearBuffers(RenderContext* pRenderContext, const RenderData& renderData)
@@ -418,11 +419,11 @@ void SSGAFPass::renderUI(Gui::Widgets& widget)
     
     widget.text("");
     widget.text("Contol edge stopping on bilateral fitler");
-    dirty |= (int)widget.var("For XY", mPhiXY, 0.5f, 1000.0f, 0.01f);
-    dirty |= (int)widget.var("For Color", mPhiColor, 0.01f, 10000.0f, 0.01f);
-    dirty |= (int)widget.var("Threshold sample count for PhiColor to take effect", mIgnorePhiColorSampleCountThreshold, 1.f, 1000.0f, 1.f);
-    dirty |= (int)widget.var("For Normal", mPhiNormal, 0.001f, 1000.0f, 0.2f);
-    dirty |= (int)widget.var("For Depth", mPhiDepth, 0.001f, 100.0f);
+    dirty |= (int)widget.var("For XY", mPhiXY, 0.0005f, 1000.0f, 0.01f);
+    dirty |= (int)widget.var("For Color", mPhiColor, 0.000001f, 10000000.0f, 0.01f);
+    dirty |= (int)widget.var("Threshold sample count for PhiColor to take effect", mIgnorePhiColorSampleCountThreshold, 1.f, 1e10f, 1.f);
+    dirty |= (int)widget.var("For Normal", mPhiNormal, 0.000001f, 1000000.0f, 0.2f);
+    dirty |= (int)widget.var("For Depth", mPhiDepth, 0.000001f, 1000000.0f);
 
     widget.text("");
     widget.text("How much history should be used?");

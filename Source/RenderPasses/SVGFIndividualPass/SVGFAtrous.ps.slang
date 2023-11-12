@@ -94,7 +94,7 @@ float4 main(FullScreenPassVsOut vsOut) : SV_TARGET0
     const float3 nCenter = oct_to_ndir_snorm(gLinearZAndNormal[ipos].zw);
 
     const float phiLIllumination   = gPhiColor * sqrt(max(0.0, epsVariance + var.r));
-    const float phiDepth     = max(zCenter.y, 1e-8) * gStepSize;
+    const float phiDepth     = max(zCenter.y, 1e-8) ;
 
     // explicitly store/accumulate center pixel with weight 1 to prevent issues
     // with the edge-stopping functions
@@ -119,7 +119,7 @@ float4 main(FullScreenPassVsOut vsOut) : SV_TARGET0
 
                 // compute the edge-stopping functions
                 const float2 w = computeWeight(
-                    zCenter.x, zP, phiDepth * length(float2(xx, yy)),
+                    zCenter.x, zP, phiDepth * length(float2(xx, yy))* gStepSize,
                     nCenter, nP, gPhiNormal,
                     lIlluminationCenter, lIlluminationP, phiLIllumination);
 

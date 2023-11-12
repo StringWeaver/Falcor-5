@@ -95,7 +95,7 @@ PS_OUT main(FullScreenPassVsOut vsOut) {
                 if (sppCenter >= gIgnorePhiColorSampleCountThreshold && sppP >= gIgnorePhiColorSampleCountThreshold) {
                     phiLIllumination = gPhiColor;
                 } else {
-                    phiLIllumination = 20.0f;
+                    phiLIllumination = 200.0f;
                 }
                 float wIllumination = sppP * computeWeight(step, 0, gPhiXY, zCenter, zP, gPhiDepth, nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
                 //const float wIllumination = computeWeightBspline(step, gPhiXY, zCenter, zP, gPhiDepth, nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
