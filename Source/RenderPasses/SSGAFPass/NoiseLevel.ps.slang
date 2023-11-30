@@ -62,6 +62,6 @@ PS_OUT main(FullScreenPassVsOut vsOut)
     float validSpp = gValidSpp[ipos];
     float noiseLevel = tDistributionInverseCDF975(validSpp) * sqrt(variance / validSpp);
     psOut.outRadiance =  float4(gIllumination[ipos].rgb, noiseLevel);
-    psOut.outDbgView = noiseLevel * gDbgViewScaleFactor;
+    psOut.outDbgView = validSpp * gDbgViewScaleFactor;
     return psOut;
 }

@@ -86,7 +86,7 @@ bool loadPrevData(float2 posH, out float4 prevIllum, out float prevValidSpp, out
 
     if (isReprjValid(iposPrev, ipos)) {
         prevIllum = gPrevIllum[iposPrev];
-        prevValidSpp = gPrevFrameValidSpp[iposPrev];
+        prevValidSpp = historyLength>0?gPrevFrameValidSpp[iposPrev]/historyLength:0;
         historyLength = gPrevHistoryLength[iposPrev].x;
         return true;
     } else {
@@ -141,12 +141,8 @@ PS_OUT main(FullScreenPassVsOut vsOut)
 
     // temporal integration of illumination
     float alpha = 2/(historyLength+2);
-    oldSpp *= (1-alpha);
-    newSpp *=alpha;
-    float sumSpp = oldSpp + newSpp;
-    newIllumination =  (newSpp * newIllumination +  oldSpp * prevIllumination) / sumSpp;
-    psOut.OutIllumination = newIllumination;
-    psOut.OutValidSpp = sumSpp;
+    psOut.OutIllumination = (1-alpha)*prevIllumination + alpha * newIllumination;
     psOut.OutHistoryLength = historyLength + 1.f;
+    psOut.OutValidSpp = psOut.OutHistoryLength*((1-alpha) * oldSpp + alpha * newSpp);
     return psOut;
 }

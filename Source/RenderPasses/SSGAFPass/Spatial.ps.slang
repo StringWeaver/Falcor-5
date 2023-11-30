@@ -72,6 +72,7 @@ PS_OUT main(FullScreenPassVsOut vsOut) {
     const float illuminationLuminanceCenter = luminance(illuminationCenter.rgb);
     const float sppCenter = gClearSpp ? float(gInputSpp[ipos]) : gValidSpp[ipos];
     const float3 nCenter = oct_to_ndir_unorm(gNormalRoughnessMaterialID[ipos].xy);
+    float varianceCenter = max(0,illuminationCenter.a - illuminationLuminanceCenter*illuminationLuminanceCenter);
 
     // explicitly store/accumulate center pixel with weight 1 to prevent issues
     // with the edge-stopping functions
@@ -92,10 +93,10 @@ PS_OUT main(FullScreenPassVsOut vsOut) {
                 float sppP = gClearSpp ? float(gInputSpp[p]) : gValidSpp[p];
                 // compute the edge-stopping functions
                 float phiLIllumination;
-                if (sppCenter >= gIgnorePhiColorSampleCountThreshold && sppP >= gIgnorePhiColorSampleCountThreshold) {
-                    phiLIllumination = gPhiColor;
+                if (sppCenter >= gIgnorePhiColorSampleCountThreshold && sppP>= gIgnorePhiColorSampleCountThreshold) {
+                    phiLIllumination = gPhiColor * sqrt(varianceCenter) + 0.5f;
                 } else {
-                    phiLIllumination = 200.0f;
+                    phiLIllumination = 10000.0f;
                 }
                 float wIllumination = sppP * computeWeight(step, 0, gPhiXY, zCenter, zP, gPhiDepth, nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
                 //const float wIllumination = computeWeightBspline(step, gPhiXY, zCenter, zP, gPhiDepth, nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);

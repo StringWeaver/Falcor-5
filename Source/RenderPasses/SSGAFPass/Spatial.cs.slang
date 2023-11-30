@@ -48,6 +48,7 @@ void main(uint3 dispatchThreadId: SV_DispatchThreadID, uint3 groupThreadID: SV_G
     const float sppCenter = gClearSpp ? initialSpp : gValidSpp[ipos];
     const float2 packedNCenter = gNormalRoughnessMaterialID[ipos].xy;
     const float3 nCenter = oct_to_ndir_unorm(packedNCenter);
+    float varianceCenter = max(0,illuminationCenter.a - illuminationLuminanceCenter*illuminationLuminanceCenter);
 
     gPathLengthCache[cacheIndex] = zCenter;
     gIlluminationCache[cacheIndex] = illuminationCenter;
@@ -93,6 +94,7 @@ void main(uint3 dispatchThreadId: SV_DispatchThreadID, uint3 groupThreadID: SV_G
                 int cacheIndexP = getCacheIndex(i == 0 ? thid + step : thid - step);
                 const float4 illuminationP = gIlluminationCache[cacheIndexP] ;
                 const float illuminationLuminanceP = luminance(illuminationP.rgb);
+                
                 const float zP = gPathLengthCache[cacheIndexP];
                 const float3 nP = oct_to_ndir_unorm(gNormalCache[cacheIndexP]);
                 float sppP;
@@ -100,10 +102,10 @@ void main(uint3 dispatchThreadId: SV_DispatchThreadID, uint3 groupThreadID: SV_G
 
                 // compute the edge-stopping functions
                 float phiLIllumination;
-                if (sppCenter >= gIgnorePhiColorSampleCountThreshold && sppP >= gIgnorePhiColorSampleCountThreshold) {
-                    phiLIllumination = gPhiColor;
+                if (sppCenter >= gIgnorePhiColorSampleCountThreshold && sppP>= gIgnorePhiColorSampleCountThreshold) {
+                    phiLIllumination = gPhiColor * sqrt(varianceCenter) + 0.5f;
                 } else {
-                    phiLIllumination = 200.0f;
+                    phiLIllumination = 10000.0f;
                 }
                 float wIllumination = sppP * computeWeight(step, 0, gPhiXY, zCenter, zP, gPhiDepth, nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
                 // const float wIllumination = computeWeightBspline(step, gPhiXY, zCenter, zP, gPhiDepth, nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
