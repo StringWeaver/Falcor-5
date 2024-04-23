@@ -80,8 +80,9 @@ void main(uint3 dispatchThreadId: SV_DispatchThreadID, uint3 groupThreadID: SV_G
 
     // explicitly store/accumulate center pixel with weight 1 to prevent issues
     // with the edge-stopping functions
-    float sumWIllumination = sppCenter;
-    float4 sumIllumination = sppCenter * illuminationCenter;
+    float sumWIllumination = 1;
+    float4 sumIllumination =  illuminationCenter;
+    float sumSpp = sppCenter;
     int2 dxdy = gPattern;
     GroupMemoryBarrierWithGroupSync();
     for (int step = 1; step <= SPATIAL_RADIUS; step++)
@@ -103,14 +104,16 @@ void main(uint3 dispatchThreadId: SV_DispatchThreadID, uint3 groupThreadID: SV_G
                 // compute the edge-stopping functions
                 float phiLIllumination;
                 if (sppCenter >= gIgnorePhiColorSampleCountThreshold && sppP>= gIgnorePhiColorSampleCountThreshold) {
-                    phiLIllumination = gPhiColor * sqrt(varianceCenter) + 0.5f;
+                    const float epsVariance  = 1e-10;
+                    phiLIllumination = gPhiColor * sqrt(varianceCenter+epsVariance);
                 } else {
                     phiLIllumination = 10000.0f;
                 }
-                float wIllumination = sppP * computeWeight(step, 0, gPhiXY, zCenter, zP, gPhiDepth, nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
+                float wIllumination = computeWeight(step, 0, gPhiXY, zCenter, zP, gPhiDepth, nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
                 // const float wIllumination = computeWeightBspline(step, gPhiXY, zCenter, zP, gPhiDepth, nCenter, nP, gPhiNormal, illuminationLuminanceCenter, illuminationLuminanceP, phiLIllumination);
                 sumWIllumination += wIllumination;
                 sumIllumination += wIllumination * illuminationP;
+                sumSpp+= wIllumination * sppP;
             }
             dxdy = -dxdy;
         }

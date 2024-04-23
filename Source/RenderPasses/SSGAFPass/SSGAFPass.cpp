@@ -273,15 +273,14 @@ void SSGAFPass::execute(RenderContext* pRenderContext, const RenderData& renderD
             // Spatial Accumulation
             if (i >= 1) {
                 for (int j = 0; j < 2; j++) {
-                    auto pSpatialComputePass = j^(mFrameCount%2) ? mpSpatialVertical : mpSpatialHorizontal;
+                    auto pSpatialComputePass =  j==(int)mHorizontalFirst ? mpSpatialVertical : mpSpatialHorizontal;
                     ShaderVar spatialPassCB = mUseComputeShader ? pSpatialComputePass["PerImageCB"] : mpSpatial["PerImageCB"];
-                    spatialPassCB["gPattern"] = (j ^ (mFrameCount % 2) ? int2(0, 1) : int2(1, 0)) << i - 1;
+                    spatialPassCB["gPattern"] = (j== (int)mHorizontalFirst  ? int2(0, 1) : int2(1, 0)) << i - 1;
                     spatialPassCB["gPhiXY"] = mPhiXY;
                     spatialPassCB["gPhiColor"] = mPhiColor;
                     spatialPassCB["gPhiNormal"] = mPhiNormal;
                     spatialPassCB["gPhiDepth"] = mPhiDepth;
                     spatialPassCB["gIgnorePhiColorSampleCountThreshold"] = mIgnorePhiColorSampleCountThreshold;
-                    bool isLastPass = isLastIteration && !isReprojectIter && j == 1;
                     spatialPassCB["gIteration"] = i -1 ;
                     spatialPassCB["gClearSpp"] = clearSpp;
                     
@@ -419,6 +418,7 @@ void SSGAFPass::renderUI(Gui::Widgets& widget)
     
     widget.text("");
     widget.text("Contol edge stopping on bilateral fitler");
+    widget.checkbox("HorizontalFirst", mHorizontalFirst);
     dirty |= (int)widget.var("For XY", mPhiXY, 0.0005f, 1000.0f, 0.01f);
     dirty |= (int)widget.var("For Color", mPhiColor, 0.000001f, 10000000.0f, 0.01f);
     dirty |= (int)widget.var("Threshold sample count for PhiColor to take effect", mIgnorePhiColorSampleCountThreshold, 1.f, 1e10f, 1.f);

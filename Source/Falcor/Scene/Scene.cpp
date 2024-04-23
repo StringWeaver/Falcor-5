@@ -162,6 +162,7 @@ namespace Falcor
 
         // Create animation controller.
         mpAnimationController = AnimationController::create(this, sceneData.meshStaticData, sceneData.meshSkinningData, sceneData.prevVertexCount, sceneData.animations);
+        mpAnimationController->setEnabled(false);
 
         // Some runtime mesh data validation. These are essentially asserts, but large scenes are mostly opened in Release
         for (const auto& mesh : mMeshDesc)
@@ -1075,6 +1076,7 @@ namespace Falcor
     {
         for (auto& camera : mCameras)
         {
+            camera->setIsAnimated(false);
             updateAnimatable(*camera, *mpAnimationController, true);
             camera->beginFrame();
         }

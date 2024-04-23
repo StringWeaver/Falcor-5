@@ -71,6 +71,7 @@ private:
     bool    mUseComputeShader = true;
     bool    mUseAdaptiveHistoryLength = false;
     bool    mUseFixedFrameTime = true;
+    bool    mHorizontalFirst = true;
     float   mFixedFrameTime = 16.6f;
     float   mAdaptiveHistoryLengthStrength = 1.0f;
     uint2 mFrameDim = uint2(1280,720);
