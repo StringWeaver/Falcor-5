@@ -60,14 +60,17 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
     float4 outputColor = float4(0.f);
     float noiseLevelSum = 0.f;
     float weightSum=0.f;
+    float3 luminanceSum = float3(0.f);
     if (is_valid(gEmission))
     {
         outputColor.rgb += gEmission[pixel].rgb;
+        luminanceSum += gEmission[pixel].rgb;
     }
 
     if (is_valid(gDiffuseRadiance))
     {
         float3 diffuseColor = gDiffuseRadiance[pixel].rgb;
+        luminanceSum+=diffuseColor;
         if (is_valid(gDiffuseReflectance))
         {
             diffuseColor *= gDiffuseReflectance[pixel].rgb;
@@ -82,6 +85,7 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
     if (is_valid(gSpecularRadiance))
     {
         float3 specularColor = gSpecularRadiance[pixel].rgb;
+        luminanceSum+=specularColor;
         if (is_valid(gSpecularReflectance))
         {
             specularColor *= gSpecularReflectance[pixel].rgb;
@@ -96,11 +100,13 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
     if (is_valid(gDeltaReflectionEmission))
     {
         outputColor.rgb += gDeltaReflectionEmission[pixel].rgb;
+        luminanceSum+=gDeltaReflectionEmission[pixel].rgb;
     }
 
     if (is_valid(gDeltaReflectionRadiance))
     {
         float3 deltaReflectionColor = gDeltaReflectionRadiance[pixel].rgb;
+        luminanceSum+=deltaReflectionColor;
         if (is_valid(gDeltaReflectionReflectance))
         {
             deltaReflectionColor *= gDeltaReflectionReflectance[pixel].rgb;
@@ -115,11 +121,13 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
     if (is_valid(gDeltaTransmissionEmission))
     {
         outputColor.rgb += gDeltaTransmissionEmission[pixel].rgb;
+        luminanceSum+=gDeltaTransmissionEmission[pixel].rgb;
     }
 
     if (is_valid(gDeltaTransmissionRadiance))
     {
         float3 deltaTransmissionColor = gDeltaTransmissionRadiance[pixel].rgb;
+        luminanceSum += deltaTransmissionColor;
         if (is_valid(gDeltaTransmissionReflectance))
         {
             deltaTransmissionColor *= gDeltaTransmissionReflectance[pixel].rgb;
@@ -132,12 +140,13 @@ void main(uint3 dispatchThreadId : SV_DispatchThreadID)
 
     if (is_valid(gResidualRadiance))
     {
+        luminanceSum+=gResidualRadiance[pixel].rgb;
         outputColor.rgb += gResidualRadiance[pixel].rgb;
     }
 
     gOutput[pixel] = outputColor;
     if (is_valid(gOutNoiseLevel)) {
         float eps = 0.1f;
-        gOutNoiseLevel[pixel] = noiseLevelSum/weightSum ;
+        gOutNoiseLevel[pixel] = noiseLevelSum/weightSum/luminance(luminanceSum);
     }
 }

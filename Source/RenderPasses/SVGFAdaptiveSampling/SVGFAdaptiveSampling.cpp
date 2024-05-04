@@ -153,8 +153,8 @@ void SVGFAdaptiveSampling::renderUI(Gui::Widgets& widget)
     widget.checkbox("Enable Adaptive Sampling", mUseAdaptiveSampling);
     if (mUseAdaptiveSampling) {
         widget.text("Contol Adaptive Sampling Threshold");
-        widget.var("Smoothstep min", mSmoothstepMin, 0.0f, 1.0f, 0.001f);
-        widget.var("Smoothstep max", mSmoothstepMax, mSmoothstepMin, 4.0f, 0.001f);
+        widget.var("Smoothstep min", mSmoothstepMin, 0.0f, 10000.0f, 0.001f);
+        widget.var("Smoothstep max", mSmoothstepMax, mSmoothstepMin, 100000.f, 0.001f);
     }
     else {
         widget.var("Fixed spp", mFixedSpp, uint32_t(1), uint32_t(5));

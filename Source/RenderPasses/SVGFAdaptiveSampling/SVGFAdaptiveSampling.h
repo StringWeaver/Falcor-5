@@ -62,6 +62,6 @@ private:
     Fbo::SharedPtr mpFbo;
     bool mUseAdaptiveSampling = true;
     uint32_t mFixedSpp = 1;
-    float mSmoothstepMin = 0.2f;
-    float mSmoothstepMax = 0.4f;
+    float mSmoothstepMin = 10.0f;
+    float mSmoothstepMax = 30.0f;
 };
